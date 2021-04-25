@@ -15,8 +15,11 @@ nnoremap <Esc><Esc> :nohlsearch<CR><Esc>
 
 inoremap qq <ESC>
 vnoremap qq <ESC>
+
 nnoremap j gj
 nnoremap k gk
+nnoremap $ $l
+nnoremap <END> <END>l
 
 set expandtab "タブをスペースに変換して表示
 set tabstop=4 "タブの文字幅（スペース幅）
