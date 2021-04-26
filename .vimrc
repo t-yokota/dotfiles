@@ -36,4 +36,4 @@ augroup highlightIdegraphicSpace "全角スペースの可視化
 augroup END
 
 syntax enable "シンタックスハイライトの有効化
-colorscheme default "カラースキームの設定
+colorscheme default "カラースキームの設定（全角スペースの可視化の実行に必要）
