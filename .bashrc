@@ -56,6 +56,7 @@ if [ -n "$force_color_prompt" ]; then
     fi
 fi
 
+# modified by @yokota
 # get git-prompt.sh from https://github.com/git/git/blob/master/contrib/completion/git-prompt.sh
 # command$ cd ~ && curl https://raw.githubusercontent.com/git/git/master/contrib/completion/git-prompt.sh -o ".git-prompt.sh" (2021/04/26)
 source ~/.git-prompt.sh
@@ -68,9 +69,10 @@ else
 fi
 unset color_prompt force_color_prompt
 
+# added by @yokota
 # switching path display in prompt
 ppath () {
-    echo "$PS1" | grep -q '\\w'
+    echo $PS1 | grep -q '\\w'
     if [ $? = 0 ]; then
         PS1=${PS1//\\w/\\W}
     else
@@ -110,6 +112,7 @@ alias ll='ls -alF'
 alias la='ls -A'
 alias l='ls -CF'
 
+# added by @yokota
 alias p='pwd'
 alias cl='clear'
 
@@ -137,6 +140,7 @@ if ! shopt -oq posix; then
   fi
 fi
 
+# added by @yokota
 # Auto-launching ssh-agent on Git for Windows
 # page: https://docs.github.com/en/github/authenticating-to-github/working-with-ssh-key-passphrases#auto-launching-ssh-agent-on-git-for-windows
 env=~/.ssh/agent.env
@@ -153,3 +157,28 @@ elif [ "$SSH_AUTH_SOCK" ] && [ $agent_run_state = 1 ]; then
     ssh-add
 fi
 unset env
+
+# added by @yokota
+# activate virtual environment if you are in the python-venv directory.
+von () {
+    curr_path=$(pwd)
+    curr_dir=${curr_path##*/}
+
+    echo $curr_path | grep -q $USER
+    if [ $? = 0 ]; then
+        while [ "$curr_dir" != "$USER" ]
+        do
+            if [ -f pyvenv.cfg ]; then
+                source $curr_path/bin/activate
+                break
+            else
+                curr_path=${curr_path%/*}
+                curr_dir=${curr_path##*/}
+            fi
+        done
+    fi
+}
+unset curr_path
+unset curr_dir
+
+alias voff='deactivate'
