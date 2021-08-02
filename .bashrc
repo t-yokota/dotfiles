@@ -76,7 +76,7 @@ ppath () {
     if [ $? = 0 ]; then
         PS1=${PS1//\\w/\\W}
     else
-        echo "$PS1" | grep -q '\\W'
+        echo $PS1 | grep -q '\\W'
         if [ $? = 0 ]; then
             PS1=${PS1//\\W/\\w}
         fi
@@ -168,7 +168,7 @@ von () {
     if [ $? = 0 ]; then
         while [ "$curr_dir" != "$USER" ]
         do
-            if [ -f pyvenv.cfg ]; then
+            if [ -f $curr_path/pyvenv.cfg ] && [ -f $curr_path/bin/activate ] ; then
                 source $curr_path/bin/activate
                 break
             else
