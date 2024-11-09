@@ -21,7 +21,7 @@ nnoremap k gk
 nnoremap $ $l
 nnoremap <END> <END>l
 
-set expandtab "タブをスペースに変換して表示
+"set expandtab "タブをスペースに変換して表示
 set tabstop=4 "タブの文字幅（スペース幅）
 set softtabstop=4 "tabキー押下時に挿入する文字幅
 set shiftwidth=4 "自動挿入される文字幅
