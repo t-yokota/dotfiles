@@ -102,3 +102,39 @@ source $ZSH/oh-my-zsh.sh
 # Example aliases
 # alias zshconfig="mate ~/.zshrc"
 # alias ohmyzsh="mate ~/.oh-my-zsh"
+
+### Add by myself ###
+setopt no_beep
+
+alias cl='clear'
+
+### venv
+# activate python virtual environment if you are in the directory of python-venv
+von() {
+    local curr_path="$PWD"
+    local home_dir="$HOME"
+    local venv_found=false
+
+    if [[ "$curr_path" == "$home_dir"* ]]; then
+        while [[ "$curr_path" != "$home_dir" ]]; do
+            if [[ -f "$curr_path/pyvenv.cfg" && -f "$curr_path/bin/activate" ]]; then
+                if source "$curr_path/bin/activate"; then
+                    echo "Activated virtual environment in: $curr_path"
+                    venv_found=true
+                else
+                    echo "Failed to activate virtual environment in: $curr_path"
+                fi
+                break
+            fi
+            curr_path="${curr_path%/*}"
+        done
+
+        if [[ "$venv_found" == false ]]; then
+            echo "No virtual environment found in the current path hierarchy."
+        fi
+    else
+        echo "Current directory is not within the home directory. Skipping virtual environment activation."
+    fi
+}
+
+alias voff='deactivate'
