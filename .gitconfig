@@ -3,3 +3,4 @@
 	name = t-yokota
 [core]
 	autocrlf = input
+	pager = less -Q # suppresses audible bell (may show visual bell instead)
