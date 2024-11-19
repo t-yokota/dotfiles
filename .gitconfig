@@ -5,3 +5,5 @@
 	autocrlf = input
 	pager = less -Q # suppresses audible bell (may show visual bell instead)
 	editor = vim
+[init]
+	defaultBranch = main
