@@ -1,4 +1,4 @@
-time="%(?.%{$fg[green]%}.%{$fg[red]%})%*%{$reset_color%}"
+time="%(?.%{$fg[green]%}.%{$fg[red]%})%D{%H:%M:%S}%{$reset_color%}"
 
 PROMPT="${time} %{$fg[cyan]%}%~%{$reset_color%}"
 PROMPT+='$(git_prompt_info) > '
