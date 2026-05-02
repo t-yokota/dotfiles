@@ -1,0 +1,39 @@
+{
+  "model": "opus[1m]",
+  "enabledPlugins": {
+    "claude-code-setup@claude-plugins-official": true
+  },
+  "permissions": {
+    "allow": [
+      "Bash(git *)",
+      "Bash(ls*)",
+      "Bash(find*)",
+      "Bash(grep*)",
+      "Bash(rg*)",
+      "Bash(cat*)",
+      "Bash(head*)",
+      "Bash(tail*)",
+      "Bash(wc*)",
+      "Bash(npm run *)",
+      "Bash(npx *)",
+      "Bash(pnpm run *)",
+      "Bash(yarn *)",
+      "Bash(node *)",
+      "mcp__context7__*"
+    ],
+    "ask": [
+      "Bash(rm *)",
+      "Bash(rmdir *)",
+      "Bash(chmod *)",
+      "Bash(chown *)",
+      "Bash(npm install *)",
+      "Bash(npm uninstall *)",
+      "Bash(pnpm install *)",
+      "Bash(git push*)",
+      "Bash(git reset*)",
+      "Bash(git checkout*)",
+      "Bash(git rebase*)",
+      "Bash(git branch -D*)"
+    ]
+  }
+}

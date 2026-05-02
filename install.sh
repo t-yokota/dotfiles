@@ -8,8 +8,20 @@ cd "$DOTPATH" || { echo "Error: Could not cd to $DOTPATH"; exit 1; }
 echo "Creating symbolic links for .dotfiles in $DOTPATH"
 for f in .??*; do
     [ "$f" = ".git" ] && continue
+    [ "$f" = ".claude" ] && continue
     ln -snfv "$DOTPATH/$f" "$HOME/$f"
 done
+
+# Claude Code config — symlink files individually to preserve runtime state
+# (sessions/, projects/, history.jsonl, etc. live under ~/.claude/)
+if [ -d "$DOTPATH/.claude" ]; then
+    echo "Creating symbolic links for Claude Code config in $HOME/.claude"
+    mkdir -p "$HOME/.claude"
+    for f in "$DOTPATH"/.claude/*; do
+        name=$(basename "$f")
+        ln -snfv "$f" "$HOME/.claude/$name"
+    done
+fi
 
 if [ -d "$OH_MY_ZSH_THEMES" ]; then
     echo "Creating symbolic links for .zsh-theme files in $OH_MY_ZSH_THEMES"
