@@ -1,89 +1,109 @@
-# CLAUDE.md
+# User-Level CLAUDE.md Example
 
-This file is loaded into every Claude Code session via `~/.claude/CLAUDE.md`. Project-specific `CLAUDE.md` and `.claude/rules/*.md` override these defaults. The authoritative local reference for Claude Code internals is `~/developments/agent-references/claude-code-best-practice/` — search there before relying on training knowledge or external sources.
+This is an example user-level CLAUDE.md file. Place at `~/.claude/CLAUDE.md`.
 
-## Key Components
+User-level configs apply globally across all projects. Use for:
+- Personal coding preferences
+- Universal rules you always want enforced
+- Links to your modular rules
 
-### Skill Definition Structure
-Skills in `.claude/skills/<name>/SKILL.md` use YAML frontmatter:
-- `name`: Display name and `/slash-command` (defaults to directory name)
-- `description`: When to invoke (recommended for auto-discovery)
-- `argument-hint`: Autocomplete hint (e.g., `[issue-number]`)
-- `disable-model-invocation`: Set `true` to prevent automatic invocation
-- `user-invocable`: Set `false` to hide from `/` menu (background knowledge only)
-- `allowed-tools`: Tools allowed without permission prompts when skill is active
-- `model`: Model to use when skill is active
-- `context`: Set to `fork` to run in isolated subagent context
-- `agent`: Subagent type for `context: fork` (default: `general-purpose`)
-- `hooks`: Lifecycle hooks scoped to this skill
+---
 
-### Hooks System
-Hook events configurable in `.claude/settings.json`: `PreToolUse`, `PostToolUse`, `PostToolUseFailure`, `UserPromptSubmit`, `Notification`, `Stop`, `StopFailure`, `SubagentStart`, `SubagentStop`, `PreCompact`, `PostCompact`, `SessionStart`, `SessionEnd`, `Setup`, `PermissionRequest`, `PermissionDenied`, `TeammateIdle`, `TaskCreated`, `TaskCompleted`, `ConfigChange`, `WorktreeCreate`, `WorktreeRemove`, `InstructionsLoaded`, `Elicitation`, `ElicitationResult`, `CwdChanged`, `FileChanged`.
+## Core Philosophy
 
-Hook fields: `command`, `timeout` (ms), `async` (bool), `statusMessage`, `once` (bool), `matcher` (tool name regex for `*ToolUse`, file glob for `FileChanged`).
+You are Claude Code. I use specialized agents and skills for complex tasks.
 
-## Critical Patterns
+**Key Principles:**
+1. **Agent-First**: Delegate to specialized agents for complex work
+2. **Parallel Execution**: Use Task tool with multiple agents when possible
+3. **Plan Before Execute**: Use Plan Mode for complex operations
+4. **Test-Driven**: Write tests before implementation
+5. **Security-First**: Never compromise on security
 
-### Subagent Orchestration
-Subagents **cannot** invoke other subagents via bash commands. Use the Agent tool (renamed from Task in v2.1.63; `Task(...)` still works as an alias):
-```
-Agent(subagent_type="agent-name", description="...", prompt="...", model="haiku")
-```
+---
 
-Be explicit about tool usage in subagent definitions. Avoid vague terms like "launch" that could be misinterpreted as bash commands.
+## Modular Rules
 
-### Subagent Definition Structure
-Subagents in `.claude/agents/*.md` use YAML frontmatter:
-- `name`: Subagent identifier
-- `description`: When to invoke (use "PROACTIVELY" for auto-invocation)
-- `tools`: Comma-separated allowlist of tools (inherits all if omitted). Supports `Agent(agent_type)` syntax
-- `disallowedTools`: Tools to deny, removed from inherited or specified list
-- `model`: Model alias: `haiku`, `sonnet`, `opus`, or `inherit` (default: `inherit`)
-- `permissionMode`: Permission mode (e.g., `"acceptEdits"`, `"plan"`, `"bypassPermissions"`)
-- `maxTurns`: Maximum agentic turns before the subagent stops
-- `skills`: List of skill names to preload into agent context
-- `mcpServers`: MCP servers for this subagent (server names or inline configs)
-- `hooks`: Lifecycle hooks scoped to this subagent (all hook events are supported; `PreToolUse`, `PostToolUse`, and `Stop` are the most common)
-- `memory`: Persistent memory scope — `user`, `project`, or `local`
-- `background`: Set to `true` to always run as a background task
-- `effort`: Effort level override: `low`, `medium`, `high`, `max` (default: inherits from session)
-- `isolation`: Set to `"worktree"` to run in a temporary git worktree
-- `color`: CLI output color for visual distinction
+Detailed guidelines are in `~/.claude/rules/`:
 
-### Configuration Hierarchy
-1. **Managed** (`managed-settings.json` / MDM plist / Registry): Organization-enforced, cannot be overridden
-2. Command line arguments: Single-session overrides
-3. `.claude/settings.local.json`: Personal project settings (git-ignored)
-4. `.claude/settings.json`: Team-shared settings
-5. `~/.claude/settings.json`: Global personal defaults
+| Rule File | Contents |
+|-----------|----------|
+| security.md | Security checks, secret management |
+| coding-style.md | Immutability, file organization, error handling |
+| testing.md | TDD workflow, 80% coverage requirement |
+| git-workflow.md | Commit format, PR workflow |
+| agents.md | Agent orchestration, when to use which agent |
+| patterns.md | API response, repository patterns |
+| performance.md | Model selection, context management |
+| hooks.md | Hooks System |
 
-### Disable Hooks
-Set `"disableAllHooks": true` in `.claude/settings.local.json`, or disable individual hooks per project.
+---
 
-### Bash Command Style (Custom)
-`settings.json` permission patterns are prefix-matched globs like `Bash(git *)`. Commands that don't fit them produce unnecessary permission prompts.
-- **Don't use `git -C <path>` flags.** Rely on the current working directory. `git -C ...` does not match `Bash(git *)` and triggers prompts.
-- **Avoid `&&` chaining for independent commands.** Issue them as parallel Bash tool calls. Chained commands are evaluated as a single string and bypass per-command permission patterns. Use `&&` only when a later step genuinely depends on the earlier one's success.
-- Issue parallel tool calls in a single message when commands are independent — faster, and each call matches its own permission pattern.
-- Prefer ripgrep (`rg`) over `grep` / `find` when available.
+## Available Agents
 
-## Answering Best Practice Questions
+Located in `~/.claude/agents/`:
 
-When the user asks a Claude Code best practice question, **always search the local reference repo first** at `~/developments/agent-references/claude-code-best-practice/` (`best-practice/`, `reports/`, `tips/`, `implementation/`, and `README.md`) before relying on training knowledge or external sources. This repo is the authoritative source — only fall back to external docs or web search if the answer is not found here.
+| Agent | Purpose |
+|-------|---------|
+| planner | Feature implementation planning |
+| architect | System design and architecture |
+| tdd-guide | Test-driven development |
+| code-reviewer | Code review for quality/security |
+| security-reviewer | Security vulnerability analysis |
+| build-error-resolver | Build error resolution |
+| e2e-runner | Playwright E2E testing |
+| refactor-cleaner | Dead code cleanup |
+| doc-updater | Documentation updates |
 
-## Workflow Best Practices
+---
 
-- Keep CLAUDE.md under 200 lines per file for reliable adherence
-- `.claude/rules/*.md` with `paths:` YAML frontmatter are lazy-loaded only when Claude touches matching files; without frontmatter they load into every session like CLAUDE.md
-- Use commands for workflows instead of standalone agents
-- Create feature-specific subagents with skills (progressive disclosure) rather than general-purpose agents
-- Perform manual `/compact` at ~50% context usage
-- Start with plan mode for complex tasks
-- Use human-gated task list workflow for multi-step tasks
-- Break subtasks small enough to complete in under 50% context
+## Personal Preferences
 
-### Debugging Tips
-- Use `/doctor` for diagnostics
-- Run long-running terminal commands as background tasks for better log visibility
-- Use browser automation MCPs (Claude in Chrome, Playwright, Chrome DevTools) for Claude to inspect console logs
-- Provide screenshots when reporting visual issues
+### Privacy
+- Always redact logs; never paste secrets (API keys/tokens/passwords/JWTs)
+- Review output before sharing - remove any sensitive data
+
+### Code Style
+- No emojis in code, comments, or documentation
+- Prefer immutability - never mutate objects or arrays
+- Many small files over few large files
+- 200-400 lines typical, 800 max per file
+
+### Git
+- Conventional commits: `feat:`, `fix:`, `refactor:`, `docs:`, `test:`
+- Always test locally before committing
+- Small, focused commits
+
+### Testing
+- TDD: Write tests first
+- 80% minimum coverage
+- Unit + integration + E2E for critical flows
+
+### Knowledge Capture
+- Personal debugging notes, preferences, and temporary context → auto memory
+- Team/project knowledge (architecture decisions, API changes, implementation runbooks) → follow the project's existing docs structure
+- If the current task already produces the relevant docs, comments, or examples, do not duplicate the same knowledge elsewhere
+- If there is no obvious project doc location, ask before creating a new top-level doc
+
+---
+
+## Editor Integration
+
+I use Zed as my primary editor:
+- Agent Panel for file tracking
+- CMD+Shift+R for command palette
+- Vim mode enabled
+
+---
+
+## Success Metrics
+
+You are successful when:
+- All tests pass (80%+ coverage)
+- No security vulnerabilities
+- Code is readable and maintainable
+- User requirements are met
+
+---
+
+**Philosophy**: Agent-first design, parallel execution, plan before action, test before code, security always.
