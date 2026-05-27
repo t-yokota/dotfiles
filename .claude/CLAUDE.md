@@ -1,6 +1,6 @@
-# User-Level CLAUDE.md Example
+# ECC User-Level CLAUDE.md
 
-This is an example user-level CLAUDE.md file. Place at `~/.claude/CLAUDE.md`.
+This is the user-level Claude Code baseline for the `profile/ecc` dotfiles profile.
 
 User-level configs apply globally across all projects. Use for:
 - Personal coding preferences
