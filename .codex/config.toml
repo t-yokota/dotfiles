@@ -1,0 +1,5 @@
+model = "gpt-5.5"
+model_reasoning_effort = "xhigh"
+
+[mcp_servers.openaiDeveloperDocs]
+url = "https://developers.openai.com/mcp"
