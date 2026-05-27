@@ -1,14 +1,14 @@
 # ECC Dotfiles Manual Install Procedure
 
-Last reviewed: 2026-05-27
+Last reviewed: 2026-05-28
 
-この手順は、dotfiles 側の `.claude` / `.codex` がまっさらな状態から、Everything Claude Code (ECC) の manual install 対象を fake HOME で dotfiles に取り込み、実 HOME へは dotfiles の `install.sh` で symlink するためのものです。
+この手順は、dotfiles 側の `.claude` / `.codex` がまっさらな状態から、Everything Claude Code (ECC) の manual install 対象を `HOME=$DOTPATH` で dotfiles に取り込み、実 HOME へは dotfiles の `install.sh` で symlink するためのものです。
 
 ## 前提
 
 - dotfiles branch は `profile/ecc` を使う。
 - ECC repo の場所は `ECC_REPO` 変数で指定する。
-- Claude plugin route と Claude manual installer route は重ねない。今回は plugin ではなく、fake HOME で manual installer を利用する。
+- Claude plugin route と Claude manual installer route は重ねない。今回は plugin ではなく、`HOME=$DOTPATH` で manual installer を利用する。
 - Claude manual installer の既定 profile は `full` とする。
 - Codex plugin route と Codex sync script route は重ねない。今回は plugin ではなく、`CODEX_HOME` 指定で sync script を利用する。
 - 最初は必ず dry-run で配置先を確認する。
@@ -62,11 +62,11 @@ flowchart TD
 
 ## Manual install の範囲
 
-ECC の Claude manual installer は、profile に含まれる modules を `~/.claude/` に配置します。この手順では fake HOME を使うため、実際の出力先は `~/dotfiles/.claude/` になります。
+ECC の Claude manual installer は、profile に含まれる modules を `~/.claude/` に配置します。この手順では `HOME=$DOTPATH` を指定するため、実際の出力先は `~/dotfiles/.claude/` になります。
 
 代表的な module と配置先は次です。
 
-| module | 主な source | fake HOME での配置先 |
+| module | 主な source | `HOME=$DOTPATH` での配置先 |
 |---|---|---|
 | `rules-core` | `rules/` | `~/dotfiles/.claude/rules/ecc/` |
 | `agents-core` | `.agents/`, `agents/`, `AGENTS.md` | `~/dotfiles/.claude/.agents/`, `~/dotfiles/.claude/agents/`, `~/dotfiles/.claude/AGENTS.md` |
@@ -105,7 +105,7 @@ ECC installer の install-state は `~/dotfiles/.claude/ecc/install-state.json` 
 - `.codex/AGENTS.md`: Codex の global instructions。ECC sync により marker付き block が入る。
 - `.agents/skills/`: Codex が読む user-level skills。ECC sync script は skills をコピーしないため、必要な skill はここへ手動で取り込む。
 - `install.sh`: dotfiles から実 HOME へ symlink する責務を持つ。
-- `docs/`: 今回の運用方針、fake HOME 手順、runtime state / branch 切り替え方針を記録する。
+- `docs/`: 今回の運用方針、`HOME=$DOTPATH` 手順、runtime state / branch 切り替え方針を記録する。
 
 project-level の `AGENTS.md`, `CLAUDE.md`, `.codex/config.toml`, `.claude/settings.json` は別レイヤーとして後から各projectで管理します。
 
@@ -184,14 +184,14 @@ touch .codex/config.toml
 
 ## 3. ECC repo の依存関係を通常 HOME で入れる
 
-ECC の installer / sync script は Node dependencies を使います。fake HOME で `npm install` が走ると npm cache 等が dotfiles 側に混ざる可能性があるため、依存関係は通常 HOME のまま先に解決します。
+ECC の installer / sync script は Node dependencies を使います。`HOME=$DOTPATH` で `npm install` が走ると npm cache 等が dotfiles 側に混ざる可能性があるため、依存関係は通常 HOME のまま先に解決します。
 
 ```bash
 cd "$ECC_REPO"
 npm install
 ```
 
-## 4. Claude を fake HOME で dry-run する
+## 4. Claude installer を HOME=$DOTPATH 指定で dry-run する
 
 Claude 側は、`HOME=~/dotfiles` として ECC manual installer を実行します。これにより、ECC は `~/.claude` ではなく `~/dotfiles/.claude` を install root として扱います。
 
@@ -215,9 +215,9 @@ dry-run で確認する主な出力先は次です。
 ~/dotfiles/.claude/ecc/install-state.json
 ```
 
-## 5. Claude を dotfiles 側へ適用する
+## 5. Claude installer を実行して dotfiles 側へ適用する
 
-dry-run の内容に問題がなければ、同じ fake HOME で apply します。
+dry-run の内容に問題がなければ、同じ `HOME=$DOTPATH` で apply します。
 
 ```bash
 cd "$ECC_REPO"
@@ -227,7 +227,7 @@ HOME="$DOTPATH" bash ./install.sh --target claude --profile full
 
 この時点では、実 HOME の `~/.claude` は直接変更されません。ECC の実体は `~/dotfiles/.claude` に入ります。
 
-## 6. Codex を CODEX_HOME 指定で dry-run する
+## 6. Codex sync を dotfiles 側の CODEX_HOME 指定で dry-run する
 
 Codex sync script は、Claude installer と違って主な出力先を `HOME` ではなく `CODEX_HOME` から決めます。dotfiles 側へ受けるには `CODEX_HOME="$DOTPATH/.codex"` を明示します。
 
@@ -263,30 +263,11 @@ dry-run で確認する主な出力先は次です。
 
 Codex sync は `agents/` や `prompts/` の下に `ecc/` directory を切りません。`prompts` は `ecc-*` prefix、`agents` は sample role file 名で配置されます。
 
-## 7. Codex skills を .agents/skills に取り込む
+## 7. Codex sync apply を実行して dotfiles 側へ適用する
 
-ECC の Codex sync script は skills を `~/.codex/skills/` や `~/.agents/skills/` へコピーしません。Codex は user-level skills を `$HOME/.agents/skills/` から読むため、この dotfiles では ECC repo の Codex skills bundle 全体を `~/dotfiles/.agents/skills/` に手動で取り込み、`install.sh` で `~/.agents/skills` へ symlink します。
+Codex sync apply は、AGENTS / config / agents / prompts / MCP に加えて、global git hooks 用の hook body 生成も行います。この手順では `GIT_CONFIG_GLOBAL="$DOTPATH/.gitconfig.local"` を明示し、`core.hooksPath` を tracked `.gitconfig` へ書かせません。
 
-つまり、Codex sync script は `AGENTS.md`, `config.toml`, `agents`, `prompts`, git hooks を扱い、Codex skills の実体化は別手順です。`install.sh` も ECC repo からの copy は行わず、dotfiles に置かれた desired state を実 HOME へ symlink するだけにします。
-
-既存の `~/.agents/skills` が dotfiles 管理 symlink ではない directory として存在する場合、後段の `bash install.sh` は preflight で止まります。初回移行では、既存内容を `~/dotfiles/.agents/skills` へ統合するか、退避してから進めます。
-
-取り込み対象は、ECC repo の `.agents/skills/` 全体です。ECC の `scripts/codex/check-codex-global-state.sh` はこの bundle のうち代表的な 16 skills を post-sync sanity check で確認しますが、skills の profile / subset 選択ではありません。
-
-既存の bundle を置き換えるため、実行前後に `git diff -- .agents/skills` で差分を確認します。
-
-```bash
-cd "$DOTPATH"
-rm -rf .agents/skills
-mkdir -p .agents/skills
-cp -R "$ECC_REPO/.agents/skills/." .agents/skills/
-```
-
-## 8. Codex sync apply は別途確認してから行う
-
-Codex sync apply は、AGENTS / config / agents / prompts / MCP に加えて、global git hooks 設定も行います。この手順では `GIT_CONFIG_GLOBAL="$DOTPATH/.gitconfig.local"` を明示し、`core.hooksPath` を tracked `.gitconfig` へ書かせません。
-
-`.codex/git-hooks/` と `.gitconfig.local` は machine-local state として commit しません。別環境でこの profile を使う場合は、dotfiles を pull したあとに Codex sync apply または ECC の git hook installer を再実行し、その環境の hook body と `core.hooksPath` を再生成します。
+そのため、sync apply は `$DOTPATH/.codex/git-hooks/` と `$DOTPATH/.gitconfig.local` を生成・更新しますが、どちらも machine-local state として commit しません。この profile では、hook body を dotfiles 側に生成して観察しつつ、tracked `.gitconfig` や実 HOME の Git config には接続しない、という扱いにします。別環境でこの profile を使う場合は、dotfiles を pull したあとに Codex sync apply または ECC の git hook installer を再実行し、その環境の hook body と `core.hooksPath` を再生成します。
 
 apply する場合は、dry-run の出力と `.gitconfig.local` への影響を確認してから実行します。
 
@@ -301,11 +282,11 @@ GIT_CONFIG_GLOBAL="$DOTPATH/.gitconfig.local" \
 bash scripts/sync-ecc-to-codex.sh
 ```
 
-global hooks まで入れたくない場合は、この sync apply は保留し、dry-run の結果を見ながら `AGENTS.md`, `config.toml`, `agents`, `prompts` を個別に取り込む方針にします。
+global hooks の生成自体も避けたい場合は、この sync apply は保留し、dry-run の結果を見ながら `AGENTS.md`, `config.toml`, `agents`, `prompts` を個別に取り込む方針にします。
 
 ### ECC global git hooks を実 HOME で有効化する
 
-前段の Codex sync apply は fake HOME の `$DOTPATH` を出力先にするため、`core.hooksPath` も `$DOTPATH/.gitconfig.local` に逃がしています。このファイルは commit せず、`install.sh` でも実 HOME へ symlink しません。つまり、sync apply だけでは実 HOME の Git global hooks は有効になりません。
+前段の Codex sync apply は dotfiles 側の `$DOTPATH` を出力先にするため、`core.hooksPath` も `$DOTPATH/.gitconfig.local` に逃がしています。このファイルは commit せず、`install.sh` でも実 HOME へ symlink しません。つまり、sync apply だけでは実 HOME の Git global hooks は有効になりません。
 
 ECC の global git hooks をこの環境で実際に使う場合は、hook body を ignored path の `$DOTPATH/.codex/git-hooks/` に生成し、実 HOME の machine-local config である `$HOME/.gitconfig.local` に `core.hooksPath` を書きます。
 
@@ -332,6 +313,25 @@ git config --global --get core.hooksPath
 ```bash
 GIT_CONFIG_GLOBAL="$HOME/.gitconfig.local" \
 git config --global --unset core.hooksPath
+```
+
+## 8. Codex skills bundle を .agents/skills に取り込む
+
+ECC の Codex sync script は skills を `~/.codex/skills/` や `~/.agents/skills/` へコピーしません。Codex は user-level skills を `$HOME/.agents/skills/` から読むため、この dotfiles では ECC repo の Codex skills bundle 全体を `~/dotfiles/.agents/skills/` に手動で取り込み、`install.sh` で `~/.agents/skills` へ symlink します。
+
+つまり、Codex sync script は `AGENTS.md`, `config.toml`, `agents`, `prompts`, git hooks を扱い、Codex skills の実体化は別手順です。`install.sh` も ECC repo からの copy は行わず、dotfiles に置かれた desired state を実 HOME へ symlink するだけにします。
+
+既存の `~/.agents/skills` が dotfiles 管理 symlink ではない directory として存在する場合、後段の `bash install.sh` は preflight で止まります。初回移行では、既存内容を `~/dotfiles/.agents/skills` へ統合するか、退避してから進めます。
+
+取り込み対象は、ECC repo の `.agents/skills/` 全体です。ECC の `scripts/codex/check-codex-global-state.sh` はこの bundle のうち代表的な 16 skills を post-sync sanity check で確認しますが、skills の profile / subset 選択ではありません。
+
+既存の bundle を置き換えるため、実行前後に `git diff -- .agents/skills` で差分を確認します。
+
+```bash
+cd "$DOTPATH"
+rm -rf .agents/skills
+mkdir -p .agents/skills
+cp -R "$ECC_REPO/.agents/skills/." .agents/skills/
 ```
 
 ## 9. dotfiles の install.sh で実 HOME へ symlink する
@@ -408,11 +408,11 @@ Claude plugin route を使う場合、ECC README では `--profile full` の man
 
 `profile/ecc` に commit した ECC asset は、dotfiles branch の checkout に合わせて切り替わります。branch を切り替えた後は dotfiles の `install.sh` を実行し、実 HOME 側の symlink を新しい branch の desired state に合わせます。`install.sh` は、target がなくなった dotfiles 管理 symlink を stale symlink として削除します。
 
-ECC repo 側の uninstall / doctor / repair は、dotfiles branch 切り替えの必須手順ではありません。`profile/ecc` branch 上で fake HOME に取り込んだ ECC generated asset を撤去・再生成するときだけ、必ず `HOME="$DOTPATH"` を付けて実行します。実 HOME の `~/.claude/ecc/install-state.json` は symlink していないため、通常 HOME で ECC lifecycle command を実行しても、この手順で入れた install-state は見つかりません。
+ECC repo 側の uninstall / doctor / repair は、dotfiles branch 切り替えの必須手順ではありません。`profile/ecc` branch 上で `HOME=$DOTPATH` に取り込んだ ECC generated asset を撤去・再生成するときだけ、必ず `HOME="$DOTPATH"` を付けて実行します。実 HOME の `~/.claude/ecc/install-state.json` は symlink していないため、通常 HOME で ECC lifecycle command を実行しても、この手順で入れた install-state は見つかりません。
 
-実 HOME 側は dotfiles の symlink layer です。実 HOME への反映や branch 切り替え後の更新は `bash install.sh` が担当し、ECC generated asset の lifecycle は fake HOME の ECC command が担当します。`.claude/ecc/install-state.json` は uninstall / doctor / repair が削除・検査対象を判断するための記録なので、単体では消しません。
+実 HOME 側は dotfiles の symlink layer です。実 HOME への反映や branch 切り替え後の更新は `bash install.sh` が担当し、ECC generated asset の lifecycle は `HOME=$DOTPATH` 付きの ECC command が担当します。`.claude/ecc/install-state.json` は uninstall / doctor / repair が削除・検査対象を判断するための記録なので、単体では消しません。
 
-この install-state は `.gitignore` 対象であり、`profile/ecc` の desired state として commit しません。clean clone や `git clean -X` 後は tracked asset は残っていても fake HOME 側の lifecycle state がないため、ECC の uninstall / doctor / repair / list は no-op になり得ます。その場合は、必要に応じて fake HOME で install を再実行し、`.claude/ecc/install-state.json` を再生成してから lifecycle command を使います。
+この install-state は `.gitignore` 対象であり、`profile/ecc` の desired state として commit しません。clean clone や `git clean -X` 後は tracked asset は残っていても `HOME=$DOTPATH` 側の lifecycle state がないため、ECC の uninstall / doctor / repair / list は no-op になり得ます。その場合は、必要に応じて `HOME=$DOTPATH` で install を再実行し、`.claude/ecc/install-state.json` を再生成してから lifecycle command を使います。
 
 ```bash
 cd "$ECC_REPO"

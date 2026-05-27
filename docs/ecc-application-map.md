@@ -172,7 +172,7 @@ Codex 公式ドキュメントでは、plugins は skills / MCP servers / apps /
 ```mermaid
 flowchart TD
   ECC["ECC repository"]
-  FakeHome["Run ECC with fake HOME / CODEX_HOME"]
+  DotfilesEnv["Run ECC with HOME=$DOTPATH / CODEX_HOME=$DOTPATH/.codex"]
   ManualFiles["Manual copy / local edits<br/>CLAUDE.md, settings.json<br/>config.toml, AGENTS.md"]
   HomeClaude["~/.claude/* symlinks"]
   HomeCodex["~/.codex/* symlinks"]
@@ -187,10 +187,10 @@ flowchart TD
     DotInstall["~/dotfiles/install.sh"]
   end
 
-  ECC --> FakeHome
+  ECC --> DotfilesEnv
   ECC --> ManualFiles
-  FakeHome --> DotClaude
-  FakeHome --> DotCodex
+  DotfilesEnv --> DotClaude
+  DotfilesEnv --> DotCodex
   ManualFiles --> DotClaude
   ManualFiles --> DotCodex
   ManualFiles --> DotAgents
@@ -206,7 +206,7 @@ flowchart TD
 
 ### profile/ecc branch の運用方針
 
-Claude 側は、ECC manual installer を fake HOME で実行し、`~/dotfiles/.claude/` に ECC の配置物を受けます。
+Claude 側は、ECC manual installer を `HOME=$DOTPATH` で実行し、`~/dotfiles/.claude/` に ECC の配置物を受けます。
 
 ```bash
 export DOTPATH="$HOME/dotfiles"
@@ -214,7 +214,7 @@ export ECC_REPO="/path/to/everything-claude-code"
 
 cd "$ECC_REPO"
 
-# 依存関係は通常 HOME で先に解決する。fake HOME 中に npm cache 等を dotfiles へ混ぜないため。
+# 依存関係は通常 HOME で先に解決する。HOME=$DOTPATH 中に npm cache 等を dotfiles へ混ぜないため。
 npm install
 
 # まず配置先だけ確認する。
@@ -240,7 +240,7 @@ HOME="$DOTPATH" bash ./install.sh --target claude --profile full
 
 その後、dotfiles の `install.sh` が `~/dotfiles/.claude/*` を `~/.claude/*` に個別 symlink します。これにより、Claude Code からは公式の user-level 読み込み場所にあるように見えますが、実体は dotfiles branch 側に残ります。
 
-Codex 側は、ECC sync script が `HOME` ではなく `CODEX_HOME` を主な出力先として使います。dotfiles 側に受ける場合は、`CODEX_HOME="$DOTPATH/.codex"` を明示します。`HOME` は fake HOME の基準、`AGENTS_HOME` は user-level skills の向き先、`GIT_CONFIG_GLOBAL` は global git hooks 設定の書き込み先に関係するため、dry-run でも明示しておきます。
+Codex 側は、ECC sync script が `HOME` ではなく `CODEX_HOME` を主な出力先として使います。dotfiles 側に受ける場合は、`CODEX_HOME="$DOTPATH/.codex"` を明示します。`HOME` は user-level path の基準、`AGENTS_HOME` は user-level skills の向き先、`GIT_CONFIG_GLOBAL` は global git hooks 設定の書き込み先に関係するため、dry-run でも明示しておきます。
 
 ```bash
 export DOTPATH="$HOME/dotfiles"
@@ -290,11 +290,11 @@ ignore 対象は `.gitignore` でも enforce します。ignore 対象のファ�
 特に注意したいのは次の点です。
 
 - `~/.codex/config.toml` や `~/.codex/AGENTS.md` が dotfiles への symlink の場合、ECC の sync script は dotfiles 側を直接変更する。
-- `core.hooksPath` は tracked `.gitconfig` ではなく machine-local な `.gitconfig.local` に書く。fake HOME の sync apply では `$DOTPATH/.gitconfig.local` に逃がし、実 HOME で global hooks を有効化する場合は `$HOME/.gitconfig.local` に書く。
+- `core.hooksPath` は tracked `.gitconfig` ではなく machine-local な `.gitconfig.local` に書く。dotfiles 側の sync apply では `$DOTPATH/.gitconfig.local` に逃がし、実 HOME で global hooks を有効化する場合は `$HOME/.gitconfig.local` に書く。
 - `.codex/git-hooks/` は commit しないため、別環境では `scripts/codex/install-global-git-hooks.sh` で hook body と hooksPath を再生成する。
 - Codex sync は existing agent role file を保持し、古い `ecc-*.md` prompt を自動削除しないため、upstream 更新時は manifest / prefix ベースで cleanup してから再 sync する。
-- dotfiles branch を切り替える場合、tracked な ECC asset は branch checkout で切り替え、実 HOME 側の symlink は `install.sh` で更新する。ECC repo 側の uninstall / doctor / repair は、`profile/ecc` branch 上で fake HOME に取り込んだ ECC generated asset を撤去・検査・再生成するときに `HOME="$DOTPATH"` 付きで使う。`.claude/ecc/install-state.json` は lifecycle command が削除・検査対象を判断するための記録なので、単体では消さない。
-- `.claude/ecc/install-state.json` は ignored lifecycle state であり、desired state として commit しない。clean clone や `git clean -X` 後に ECC lifecycle command を使う場合は、fake HOME install で state を再生成してから実行する。
+- dotfiles branch を切り替える場合、tracked な ECC asset は branch checkout で切り替え、実 HOME 側の symlink は `install.sh` で更新する。ECC repo 側の uninstall / doctor / repair は、`profile/ecc` branch 上で `HOME=$DOTPATH` に取り込んだ ECC generated asset を撤去・検査・再生成するときに `HOME="$DOTPATH"` 付きで使う。`.claude/ecc/install-state.json` は lifecycle command が削除・検査対象を判断するための記録なので、単体では消さない。
+- `.claude/ecc/install-state.json` は ignored lifecycle state であり、desired state として commit しない。clean clone や `git clean -X` 後に ECC lifecycle command を使う場合は、`HOME=$DOTPATH` install で state を再生成してから実行する。
 - Claude plugin route と Claude manual installer route は重ねない。特に plugin install 後に `--profile full` を重ねない。
 - Codex plugin route と `~/.agents/skills/` への手動展開は、同じ skill が重複して見える可能性がある。
 - credentials, auth files, session logs, cache, history database, plugin cache は dotfiles に入れない。
