@@ -24,18 +24,21 @@ You are Claude Code. I use specialized agents and skills for complex tasks.
 
 ## Modular Rules
 
-Detailed guidelines are in `~/.claude/rules/`:
+Detailed ECC guidelines are installed under `~/.claude/rules/ecc/`.
+Common rules live in `~/.claude/rules/ecc/common/`; language and framework rules live in sibling directories such as `typescript/`, `python/`, `web/`, and `swift/`.
 
 | Rule File | Contents |
 |-----------|----------|
-| security.md | Security checks, secret management |
-| coding-style.md | Immutability, file organization, error handling |
-| testing.md | TDD workflow, 80% coverage requirement |
-| git-workflow.md | Commit format, PR workflow |
-| agents.md | Agent orchestration, when to use which agent |
-| patterns.md | API response, repository patterns |
-| performance.md | Model selection, context management |
-| hooks.md | Hooks System |
+| `~/.claude/rules/ecc/common/security.md` | Security checks, secret management |
+| `~/.claude/rules/ecc/common/coding-style.md` | Immutability, file organization, error handling |
+| `~/.claude/rules/ecc/common/testing.md` | TDD workflow, verification expectations |
+| `~/.claude/rules/ecc/common/git-workflow.md` | Commit format, PR workflow |
+| `~/.claude/rules/ecc/common/agents.md` | Agent orchestration, when to use which agent |
+| `~/.claude/rules/ecc/common/patterns.md` | API response, repository patterns |
+| `~/.claude/rules/ecc/common/performance.md` | Model selection, context management |
+| `~/.claude/rules/ecc/common/hooks.md` | Hooks system |
+| `~/.claude/rules/ecc/common/code-review.md` | Review focus and quality gates |
+| `~/.claude/rules/ecc/common/development-workflow.md` | Development workflow |
 
 ---
 
