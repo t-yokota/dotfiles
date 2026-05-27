@@ -379,7 +379,128 @@ ignore 対象:
 
 ignore 対象は `.gitignore` でも enforce します。ignore 対象のファイルは branch を切り替えても作業ツリーに残ります。commit 対象は、`profile/ecc` の desired state として再現・差分確認したいものに限定します。ignore 対象は環境ごとの runtime state に限定します。
 
-## 11. 運用上の注意点
+## 11. Uninstall / Regenerate 手順
+
+この dotfiles では、uninstall / cleanup の対象を layer ごとに分けます。実 HOME 側は symlink layer、`~/dotfiles` 側は tracked desired state、ECC repo 側の lifecycle command は `HOME=$DOTPATH` で作った installer output を扱います。
+
+この節のコマンド例だけを参照する場合は、先に次の変数を定義します。`ECC_REPO` は自分の環境の clone 先に置き換えます。
+
+```bash
+export DOTPATH="$HOME/dotfiles"
+export ECC_REPO="/path/to/everything-claude-code"
+```
+
+### 実 HOME の symlink を update / cleanup する
+
+`profile/ecc` に commit した ECC asset は、dotfiles branch の checkout に合わせて切り替わります。branch を切り替えた後は dotfiles の `install.sh` を実行し、実 HOME 側の symlink を新しい branch の desired state に合わせます。
+
+```bash
+cd "$DOTPATH"
+git switch <target-branch>
+bash install.sh
+```
+
+`install.sh` は、target がなくなった dotfiles 管理 symlink を stale symlink として削除します。これは `~/.claude`, `~/.codex`, `~/.agents` の中身にも適用されます。一方で、実 HOME にある non-managed file / directory や runtime state は削除しません。
+
+### Claude installer output を uninstall / regenerate する
+
+Claude manual installer で `~/dotfiles/.claude` に入れた generated asset を uninstall する場合は、ECC repo 側の uninstall を `HOME=$DOTPATH` 付きで実行します。実 HOME の `~/.claude` に対して ECC uninstall を実行する手順ではありません。
+
+```bash
+cd "$ECC_REPO"
+
+HOME="$DOTPATH" node scripts/uninstall.js --target claude --dry-run
+HOME="$DOTPATH" node scripts/uninstall.js --target claude
+```
+
+uninstall は `.claude/ecc/install-state.json` を基準に削除対象を判断します。この install-state は `.gitignore` 対象であり、`profile/ecc` の desired state として commit しません。clean clone や `git clean -X` 後は tracked asset は残っていても lifecycle state がないため、ECC の uninstall / doctor / repair / list は no-op になり得ます。その場合は、必要に応じて `HOME=$DOTPATH` で install を再実行し、state を再生成してから lifecycle command を使います。
+
+同じ `profile/ecc` branch 内で ECC installer profile を作り直す場合は、uninstall 後に目的の profile で再 install します。この branch では `full` を標準にします。
+
+```bash
+HOME="$DOTPATH" bash ./install.sh --target claude --profile full
+```
+
+Claude installer output を uninstall / regenerate した後、実 HOME へ反映するには dotfiles 側で `bash install.sh` を実行します。
+
+### Codex sync output を cleanup / regenerate する
+
+Codex sync には Claude installer の `uninstall.js` に相当する専用 unsync script はありません。`scripts/sync-ecc-to-codex.sh` は backup / marker / manifest を持ちますが、基本は add-only merge と生成物配置です。
+
+cleanup の考え方は次です。
+
+- `.codex/AGENTS.md` は `<!-- BEGIN ECC -->` / `<!-- END ECC -->` の marker block を削除するか、Git の履歴から戻す。
+- `.codex/config.toml` は add-only merge なので、自動逆変換せず、ECC baseline / MCP sections を手動で削るか、Git の履歴から戻す。
+- `.codex/agents/*.toml` と `.codex/prompts/ecc-*` は generated output として cleanup / regenerate する。
+- `.codex/backups/` は local backup であり、uninstall contract ではない。
+
+Codex sync は existing agent role file を上書きせず、古い `ecc-*.md` prompt を自動削除しません。upstream 更新を取り直す場合は、manifest と prefix を基準に古い生成物を削除してから再 sync します。
+
+```bash
+cd "$DOTPATH"
+
+if [ -f .codex/prompts/ecc-prompts-manifest.txt ]; then
+  while IFS= read -r file; do
+    [ -n "$file" ] && rm -f ".codex/prompts/$file"
+  done < .codex/prompts/ecc-prompts-manifest.txt
+fi
+
+if [ -f .codex/prompts/ecc-extension-prompts-manifest.txt ]; then
+  while IFS= read -r file; do
+    [ -n "$file" ] && rm -f ".codex/prompts/$file"
+  done < .codex/prompts/ecc-extension-prompts-manifest.txt
+fi
+
+rm -f .codex/prompts/ecc-*.md
+rm -f .codex/prompts/ecc-prompts-manifest.txt .codex/prompts/ecc-extension-prompts-manifest.txt
+rm -f .codex/agents/explorer.toml .codex/agents/docs-researcher.toml .codex/agents/reviewer.toml
+```
+
+その後、必要なら Codex sync apply を再実行します。
+
+```bash
+cd "$ECC_REPO"
+
+HOME="$DOTPATH" \
+CODEX_HOME="$DOTPATH/.codex" \
+AGENTS_HOME="$DOTPATH/.agents" \
+ECC_GLOBAL_HOOKS_DIR="$DOTPATH/.codex/git-hooks" \
+GIT_CONFIG_GLOBAL="$DOTPATH/.gitconfig.local" \
+bash scripts/sync-ecc-to-codex.sh
+```
+
+### Codex skills bundle を replace / regenerate する
+
+Codex skills は sync script の output ではなく、ECC repo の `.agents/skills/` bundle を dotfiles に手動コピーしたものです。更新する場合は bundle 全体を置き換えます。
+
+```bash
+cd "$DOTPATH"
+rm -rf .agents/skills
+mkdir -p .agents/skills
+cp -R "$ECC_REPO/.agents/skills/." .agents/skills/
+```
+
+`profile/ecc` から Codex skills を外す場合は、`.agents/skills` を tracked desired state から削除して commit し、その後 `bash install.sh` を実行します。実 HOME の `~/.agents/skills` が dotfiles 管理 symlink であれば、stale symlink として削除されます。
+
+### ECC global git hooks を disable / cleanup する
+
+Codex sync apply で生成した `$DOTPATH/.codex/git-hooks/` と `$DOTPATH/.gitconfig.local` は machine-local state です。dotfiles 側の観察用 hooksPath を消す場合は、`GIT_CONFIG_GLOBAL` を `$DOTPATH/.gitconfig.local` に向けて unset します。
+
+```bash
+GIT_CONFIG_GLOBAL="$DOTPATH/.gitconfig.local" \
+git config --global --unset core.hooksPath
+```
+
+実 HOME で global hooks を有効化していた場合は、実 HOME 側の machine-local config からも unset します。
+
+```bash
+GIT_CONFIG_GLOBAL="$HOME/.gitconfig.local" \
+git config --global --unset core.hooksPath
+```
+
+hook body 自体は ignored output なので、不要になったら `$DOTPATH/.codex/git-hooks/` を削除します。再度使う場合は `scripts/codex/install-global-git-hooks.sh` または Codex sync apply で再生成します。
+
+## 12. 運用上の注意点
 
 ### Codex sync の入力 config を用意する
 
@@ -403,52 +524,6 @@ npm install
 ### Plugin route と manual route を混ぜない
 
 Claude plugin route を使う場合、ECC README では `--profile full` の manual installer を重ねない方針が示されています。この手順では plugin ではなく manual installer を使うため、Claude の `/plugin install ecc@ecc` は使いません。
-
-### dotfiles branch を切り替える
-
-`profile/ecc` に commit した ECC asset は、dotfiles branch の checkout に合わせて切り替わります。branch を切り替えた後は dotfiles の `install.sh` を実行し、実 HOME 側の symlink を新しい branch の desired state に合わせます。`install.sh` は、target がなくなった dotfiles 管理 symlink を stale symlink として削除します。
-
-ECC repo 側の uninstall / doctor / repair は、dotfiles branch 切り替えの必須手順ではありません。`profile/ecc` branch 上で `HOME=$DOTPATH` に取り込んだ ECC generated asset を撤去・再生成するときだけ、必ず `HOME="$DOTPATH"` を付けて実行します。実 HOME の `~/.claude/ecc/install-state.json` は symlink していないため、通常 HOME で ECC lifecycle command を実行しても、この手順で入れた install-state は見つかりません。
-
-実 HOME 側は dotfiles の symlink layer です。実 HOME への反映や branch 切り替え後の更新は `bash install.sh` が担当し、ECC generated asset の lifecycle は `HOME=$DOTPATH` 付きの ECC command が担当します。`.claude/ecc/install-state.json` は uninstall / doctor / repair が削除・検査対象を判断するための記録なので、単体では消しません。
-
-この install-state は `.gitignore` 対象であり、`profile/ecc` の desired state として commit しません。clean clone や `git clean -X` 後は tracked asset は残っていても `HOME=$DOTPATH` 側の lifecycle state がないため、ECC の uninstall / doctor / repair / list は no-op になり得ます。その場合は、必要に応じて `HOME=$DOTPATH` で install を再実行し、`.claude/ecc/install-state.json` を再生成してから lifecycle command を使います。
-
-```bash
-cd "$ECC_REPO"
-
-HOME="$DOTPATH" node scripts/uninstall.js --target claude --dry-run
-HOME="$DOTPATH" node scripts/uninstall.js --target claude
-```
-
-同じ `profile/ecc` branch 内で ECC installer profile を作り直す場合は、uninstall 後に目的の profile で再 install します。この branch では `full` を標準にします。軽く試すだけなら `minimal`、通常開発向けに軽くするなら `developer` を別方針として選びます。
-
-```bash
-HOME="$DOTPATH" bash ./install.sh --target claude --profile full
-```
-
-### Codex sync を再実行する
-
-Codex sync は既存の agent role file を上書きせず、古い `ecc-*.md` prompt を自動削除しません。ECC upstream の更新を `profile/ecc` の desired state として取り直す場合は、manifest と prefix を基準に古い生成物を削除してから再 sync します。
-
-```bash
-cd "$DOTPATH"
-
-if [ -f .codex/prompts/ecc-prompts-manifest.txt ]; then
-  while IFS= read -r file; do
-    [ -n "$file" ] && rm -f ".codex/prompts/$file"
-  done < .codex/prompts/ecc-prompts-manifest.txt
-fi
-
-if [ -f .codex/prompts/ecc-extension-prompts-manifest.txt ]; then
-  while IFS= read -r file; do
-    [ -n "$file" ] && rm -f ".codex/prompts/$file"
-  done < .codex/prompts/ecc-extension-prompts-manifest.txt
-fi
-
-rm -f .codex/prompts/ecc-*.md
-rm -f .codex/agents/explorer.toml .codex/agents/docs-researcher.toml .codex/agents/reviewer.toml
-```
 
 ### Codex prompts / agents の配置を確認する
 
