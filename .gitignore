@@ -27,6 +27,7 @@
 
 # Codex runtime, credential, backup, and generated hook state
 .codex/ecc-install-state.json
+.codex/dotfiles-*-sync-state.json
 .codex/backups/
 .codex/git-hooks/
 .codex/auth.json
