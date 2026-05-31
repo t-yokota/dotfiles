@@ -1,6 +1,6 @@
 # ECC Application Map for Claude Code and Codex
 
-Last reviewed: 2026-05-28
+Last reviewed: 2026-05-30
 
 このメモは、Everything Claude Code (ECC) を Claude Code と Codex に適用するときに、何がどこへ配置され、各エージェントがどこから読むのかを整理するためのものです。
 
@@ -167,64 +167,40 @@ ECC には Codex plugin manifest もあります。Codex plugin route では、p
 
 Codex 公式ドキュメントでは、plugins は skills / MCP servers / apps / hooks などを manifest から配布できる仕組みとして説明されています。plugin route を使う場合、同じ資産を `~/.codex/` や `~/.agents/skills/` に手動展開するかどうかは、重複を避ける観点で分けて考える必要があります。
 
-## dotfiles で管理するときの考え方
+## dotfiles で管理するときの構成
+
+dotfiles で管理する場合は、ECC の出力をいったん `~/dotfiles` 配下に受け、その内容を `install.sh` で実 HOME の読み込み場所へ symlink します。Claude Code や Codex が読むのは実 HOME 側ですが、差分確認や再生成の基準は dotfiles 側に置きます。
+
+この節では、ECC の出力先と runtime の読み込み場所の対応だけを示します。導入手順、branch の作り方、commit / ignore、preflight、uninstall / regenerate は [ecc-dotfiles-manual-install.md](ecc-dotfiles-manual-install.md) を参照します。
 
 ```mermaid
 flowchart TD
   ECC["ECC repository"]
-  DotfilesEnv["Run ECC with HOME=$DOTPATH / CODEX_HOME=$DOTPATH/.codex"]
-  ManualFiles["Manual copy / local edits<br/>CLAUDE.md, settings.json<br/>config.toml, AGENTS.md"]
-  HomeClaude["~/.claude/* symlinks"]
-  HomeCodex["~/.codex/* symlinks"]
-  HomeAgents["~/.agents/* symlinks"]
+  ClaudeInstall["Claude manual installer<br/>HOME=$DOTPATH"]
+  CodexSync["Codex sync script<br/>CODEX_HOME=$DOTPATH/.codex"]
+  CodexSkills["ECC .agents/skills bundle"]
+  Install["install.sh"]
+  HomeClaude["~/.claude/"]
+  HomeCodex["~/.codex/"]
+  HomeAgents["~/.agents/skills/"]
   ClaudeRuntime["Claude Code runtime"]
   CodexRuntime["Codex runtime"]
 
-  subgraph Dotfiles["dotfiles branch: profile/ecc"]
+  subgraph Dotfiles["~/dotfiles"]
     DotClaude["~/dotfiles/.claude/"]
     DotCodex["~/dotfiles/.codex/"]
     DotAgents["~/dotfiles/.agents/skills/"]
-    DotInstall["~/dotfiles/install.sh"]
   end
 
-  ECC --> DotfilesEnv
-  ECC --> ManualFiles
-  DotfilesEnv --> DotClaude
-  DotfilesEnv --> DotCodex
-  ManualFiles --> DotClaude
-  ManualFiles --> DotCodex
-  ManualFiles --> DotAgents
-  DotClaude --> DotInstall
-  DotCodex --> DotInstall
-  DotAgents --> DotInstall
-  DotInstall --> HomeClaude --> ClaudeRuntime
-  DotInstall --> HomeCodex --> CodexRuntime
-  DotInstall --> HomeAgents --> CodexRuntime
+  ECC --> ClaudeInstall --> DotClaude
+  ECC --> CodexSync --> DotCodex
+  ECC --> CodexSkills --> DotAgents
+  DotClaude --> Install --> HomeClaude --> ClaudeRuntime
+  DotCodex --> Install --> HomeCodex --> CodexRuntime
+  DotAgents --> Install --> HomeAgents --> CodexRuntime
 ```
 
-この dotfiles では、ECC を使う user-level agent profile を `profile/ecc` branch として扱います。ECC を本物の `~/.claude/` / `~/.codex/` に直接展開するのではなく、まず dotfiles 側に受けてから、dotfiles の `install.sh` が実 HOME に symlink します。
-
-### profile/ecc branch の運用方針
-
-Claude 側は、ECC manual installer を `HOME=$DOTPATH` で実行し、`~/dotfiles/.claude/` に ECC の配置物を受けます。
-
-```bash
-export DOTPATH="$HOME/dotfiles"
-export ECC_REPO="/path/to/everything-claude-code"
-
-cd "$ECC_REPO"
-
-# 依存関係は通常 HOME で先に解決する。HOME=$DOTPATH 中に npm cache 等を dotfiles へ混ぜないため。
-npm install
-
-# まず配置先だけ確認する。
-HOME="$DOTPATH" bash ./install.sh --target claude --profile full --dry-run
-
-# 問題なければ dotfiles 側へ適用する。
-HOME="$DOTPATH" bash ./install.sh --target claude --profile full
-```
-
-このとき Claude 側の出力先は、概ね次のようになります。
+Claude 側は、ECC manual installer を `HOME=$DOTPATH` で実行し、`~/dotfiles/.claude/` に受けます。主な出力は次の通りです。
 
 ```text
 ~/dotfiles/.claude/rules/ecc/
@@ -238,67 +214,18 @@ HOME="$DOTPATH" bash ./install.sh --target claude --profile full
 ~/dotfiles/.claude/ecc/install-state.json
 ```
 
-その後、dotfiles の `install.sh` が `~/dotfiles/.claude/*` を `~/.claude/*` に個別 symlink します。これにより、Claude Code からは公式の user-level 読み込み場所にあるように見えますが、実体は dotfiles branch 側に残ります。
+Codex 側は、ECC sync script の `CODEX_HOME` を `~/dotfiles/.codex` に向けます。主な出力は次の通りです。
 
-Codex 側は、ECC sync script が `HOME` ではなく `CODEX_HOME` を主な出力先として使います。dotfiles 側に受ける場合は、`CODEX_HOME="$DOTPATH/.codex"` を明示します。`HOME` は user-level path の基準、`AGENTS_HOME` は user-level skills の向き先、`GIT_CONFIG_GLOBAL` は global git hooks 設定の書き込み先に関係するため、dry-run でも明示しておきます。
-
-```bash
-export DOTPATH="$HOME/dotfiles"
-export ECC_REPO="/path/to/everything-claude-code"
-
-cd "$ECC_REPO"
-
-# まず配置先だけ確認する。
-HOME="$DOTPATH" \
-CODEX_HOME="$DOTPATH/.codex" \
-AGENTS_HOME="$DOTPATH/.agents" \
-ECC_GLOBAL_HOOKS_DIR="$DOTPATH/.codex/git-hooks" \
-GIT_CONFIG_GLOBAL="$DOTPATH/.gitconfig.local" \
-bash scripts/sync-ecc-to-codex.sh --dry-run
+```text
+~/dotfiles/.codex/AGENTS.md
+~/dotfiles/.codex/config.toml
+~/dotfiles/.codex/agents/
+~/dotfiles/.codex/prompts/
 ```
 
-Codex sync は `~/.codex/prompts/ecc-*` や `~/.codex/agents/*.toml` のように、`ecc/` directory ではなく既存 directory 直下へ配置します。また global git safety hooks の設定も含むため、apply は別途方針を確認してから行います。
+Codex sync script は `$DOTPATH/.codex/git-hooks/` も生成できますが、これは Git global hooks 用の script body で、Codex runtime が読む `~/.codex/` の instruction / config / prompt surface とは別に扱います。
 
-Codex sync script は skills をコピーしません。Codex が user-level skills として読む `$HOME/.agents/skills/` は、ECC repo の `.agents/skills/` 全体を `~/dotfiles/.agents/skills/` に取り込み、dotfiles の `install.sh` で実 HOME へ symlink します。ECC の Codex sanity check が確認する 16 skills は、この bundle の代表的な確認対象であり、skills の profile / subset 選択ではありません。
-
-`install.sh` は `.claude`, `.codex`, `.agents` を directory 丸ごとではなく中身単位で symlink します。dot entry も対象にするため、`.claude/.agents` のような hidden entry も実 HOME へ反映できます。一方で、`~/.claude/projects`, `~/.codex/auth.json`, sessions, logs, backups, git hooks, install-state などの runtime state は skip list で除外します。既存の non-managed directory / file と衝突した場合は、symlink 作成前の preflight で止めます。
-
-### 管理対象と ignore 方針
-
-原則として、agent profile の desired state として再現・差分確認したいものは dotfiles の tracked file として持ちます。branch はその desired state を切り替える単位として扱い、環境依存の runtime state は commit しません。
-
-commit 対象の考え方:
-
-- ECC installer / sync から取り込んだ asset のうち、`profile/ecc` の runtime surface として再現・差分確認したいものを commit する。
-- Claude 側は `.claude/ecc/install-state.json` を除き、manual installer が配置した instruction / config / agent asset を対象にする。`--profile full` で増える `the-security-guide.md` のような top-level asset も、この定義に含める。
-- Codex 側は sync script が配置した `AGENTS.md`, `config.toml`, `agents`, `prompts` などのうち、Codex runtime から読む desired state を対象にする。
-- Codex skills は ECC repo の `.agents/skills/` bundle 全体を desired state として対象にする。
-- `.claude/CLAUDE.md`, `.claude/settings.json`, `.codex/config.toml` など、installer 外で手動管理する user-level file も、この profile の desired state として必要なら commit する。
-- `install.sh` や `docs/` は ECC asset ではなく、この方針を説明・実現する dotfiles local policy として別途 commit する。
-
-ignore 対象:
-
-- `.claude/ecc/install-state.json`
-- `.codex/ecc-install-state.json` if using ECC codex-home installer
-- `.codex/backups/`
-- `.codex/git-hooks/`
-- `.gitconfig.local`
-- credentials, auth files, session logs, cache, history database, plugin cache, `.agents` runtime/cache state
-
-ignore 対象は `.gitignore` でも enforce します。ignore 対象のファイルは branch を切り替えても作業ツリーに残ります。commit 対象は、`profile/ecc` の desired state として再現・差分確認したいものに限定します。ignore 対象は環境ごとの runtime state に限定します。
-
-特に注意したいのは次の点です。
-
-- `~/.codex/config.toml` や `~/.codex/AGENTS.md` が dotfiles への symlink の場合、ECC の sync script は dotfiles 側を直接変更する。
-- `core.hooksPath` は tracked `.gitconfig` ではなく machine-local な `.gitconfig.local` に書く。dotfiles 側の sync apply では `$DOTPATH/.gitconfig.local` に逃がし、実 HOME で global hooks を有効化する場合は `$HOME/.gitconfig.local` に書く。
-- `.codex/git-hooks/` は commit しないため、別環境では `scripts/codex/install-global-git-hooks.sh` で hook body と hooksPath を再生成する。
-- Codex sync には専用の unsync script がない。`AGENTS.md` は marker block、`config.toml` は add-only merge、`agents` / `prompts` は generated output として扱い、cleanup / regenerate は Git 履歴と manifest / prefix cleanup を基準に行う。existing agent role file を上書きしない点にも注意する。
-- dotfiles branch を切り替える場合、tracked な ECC asset は branch checkout で切り替え、実 HOME 側の symlink は `install.sh` で更新する。ECC repo 側の uninstall / doctor / repair は、`profile/ecc` branch 上で `HOME=$DOTPATH` に取り込んだ ECC generated asset を uninstall / inspect / regenerate するときに `HOME="$DOTPATH"` 付きで使う。`.claude/ecc/install-state.json` は lifecycle command が削除・検査対象を判断するための記録なので、単体では消さない。
-- `.claude/ecc/install-state.json` は ignored lifecycle state であり、desired state として commit しない。clean clone や `git clean -X` 後に ECC lifecycle command を使う場合は、`HOME=$DOTPATH` install で state を再生成してから実行する。
-- Claude plugin route と Claude manual installer route は重ねない。特に plugin install 後に `--profile full` を重ねない。
-- Codex plugin route と `~/.agents/skills/` への手動展開は、同じ skill が重複して見える可能性がある。
-- credentials, auth files, session logs, cache, history database, plugin cache は dotfiles に入れない。
-- project ごとの `AGENTS.md`, `CLAUDE.md`, `.codex/config.toml`, `.claude/settings.json` は、user-level 設定と別レイヤーとして扱う。
+Codex sync script は skills をコピーしないため、Codex skills は ECC repo の `.agents/skills/` bundle を `~/dotfiles/.agents/skills/` に用意します。`install.sh` 実行後、Codex は実 HOME 側の `~/.agents/skills/` からそれらを読みます。
 
 ## ECC local references
 
@@ -308,6 +235,8 @@ The examples in this document use `ECC_REPO=/path/to/everything-claude-code`.
 - Claude installer target: `$ECC_REPO/scripts/lib/install-targets/claude-home.js`
 - Codex installer target: `$ECC_REPO/scripts/lib/install-targets/codex-home.js`
 - Codex sync script: `$ECC_REPO/scripts/sync-ecc-to-codex.sh`
+- dotfiles install surface definition: `scripts/install/preflight.d/profile-ecc.sh`
+- dotfiles Codex sync marker writer: `scripts/install/write-profile-ecc-codex-sync-state.sh`
 - Claude plugin manifest: `$ECC_REPO/.claude-plugin/plugin.json`
 - Codex plugin manifest: `$ECC_REPO/.codex-plugin/plugin.json`
 
