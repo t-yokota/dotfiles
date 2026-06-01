@@ -1,5 +1,10 @@
 #!/usr/bin/env bash
 
+if [ -z "${BASH_VERSION:-}" ]; then
+    echo "Error: install.sh must be run with bash. Use: bash install.sh" >&2
+    exit 1
+fi
+
 DOTPATH=~/dotfiles
 OH_MY_ZSH_THEMES=~/.oh-my-zsh/themes
 
@@ -9,6 +14,22 @@ cd "$DOTPATH" || { echo "Error: Could not cd to $DOTPATH"; exit 1; }
 shopt -s nullglob dotglob
 
 MANAGED_SURFACES=()
+
+log_section() {
+    printf '\n== %s ==\n' "$1"
+}
+
+log_step() {
+    printf -- '- %s\n' "$1"
+}
+
+log_substep() {
+    printf '  - %s\n' "$1"
+}
+
+log_link() {
+    printf '    - Link: %s -> %s\n' "$1" "$2"
+}
 
 # Only clean symlinks that point back into the managed dotfiles directory.
 is_managed_symlink() {
@@ -159,6 +180,7 @@ load_branch_surfaces() {
 
     for script in "$DOTPATH"/scripts/install/preflight.d/*/define-surfaces.sh; do
         [ -f "$script" ] || continue
+        log_substep "$script"
         if ! surface_output=$(
             DOTPATH="$DOTPATH" DOTFILES_BRANCH="$branch" bash "$script"
         ); then
@@ -186,7 +208,7 @@ run_branch_install_checks() {
 
     for hook in "$DOTPATH"/scripts/install/preflight.d/*/check-*.sh; do
         [ -f "$hook" ] || continue
-        echo "Running branch preflight $hook"
+        log_substep "$hook"
         DOTPATH="$DOTPATH" DOTFILES_BRANCH="$branch" bash "$hook" || rc=1
     done
 
@@ -267,7 +289,8 @@ link_managed_entry() {
 
     check_managed_entry "$dest_path" "$managed_root" || return 1
 
-    ln -snfv "$source_path" "$dest_path"
+    ln -snf "$source_path" "$dest_path" || return 1
+    log_link "$dest_path" "$source_path"
 }
 
 # Cleanup can run even when source_dir no longer exists after a branch switch.
@@ -282,7 +305,7 @@ cleanup_managed_symlinks() {
 
     if [ "$container_policy" != "allow-container-symlink" ] && [ -L "$dest_dir" ]; then
         if is_managed_symlink "$dest_dir" "$source_dir"; then
-            echo "Removing managed container symlink $dest_dir"
+            log_substep "Remove managed container symlink: $dest_dir"
             rm -f "$dest_dir"
             return 0
         fi
@@ -304,7 +327,7 @@ cleanup_managed_symlinks() {
             # Remove links whose source disappeared after a branch switch, or links that are
             # now classified as runtime state by the skip list.
             if [ ! -e "$target" ] || "$skip_fn" "$name"; then
-                echo "Removing stale or skipped symlink $dest"
+                log_substep "Remove stale or skipped symlink: $dest"
                 rm -f "$dest"
             fi
         fi
@@ -334,7 +357,7 @@ link_managed_entries() {
         # Skip tool-generated state and child collection roots. Child collections
         # are handled by their own managed dotfile surface entries.
         if "$skip_fn" "$name"; then
-            echo "Skipping runtime or separately managed entry $f"
+            log_substep "Skip runtime or separately managed entry: $f"
             # If an older install linked this skipped entry, remove only that managed link.
             if is_managed_symlink "$dest" "$source_dir"; then
                 rm -f "$dest"
@@ -374,27 +397,39 @@ link_all_managed_surfaces() {
     for surface in "${MANAGED_SURFACES[@]}"; do
         IFS=$'\t' read -r source_dir dest_dir skip_fn label <<< "$surface"
         [ -d "$source_dir" ] || continue
-        echo "Creating symbolic links for $label in $dest_dir"
+        log_step "$label"
+        log_substep "Source: $source_dir"
+        log_substep "Target: $dest_dir"
         link_managed_entries "$source_dir" "$dest_dir" "$skip_fn" || return 1
     done
 }
 
-echo "Checking for non-managed symlink conflicts"
+log_section "Preflight"
+log_step "Load managed dotfile surface definitions"
 load_branch_surfaces || exit 1
+log_step "Run branch-specific install checks"
 run_branch_install_checks || exit 1
 
+log_section "Cleanup"
 # Prune stale top-level dotfile symlinks before preflight so branch removals do
 # not turn into false conflicts on the next install run.
+log_step "Prune stale top-level symlinks"
 cleanup_managed_symlinks "$DOTPATH" "$HOME" should_skip_root_entry allow-container-symlink || exit 1
-
-preflight_root_entries || exit 1
 
 # Prune old symlinks for every managed dotfile surface before conflict detection. This
 # also moves older links toward the current surface layout.
+log_step "Prune stale managed dotfile surface symlinks"
 cleanup_all_managed_surfaces || exit 1
+
+log_section "Link Conflict Check"
+log_step "Check top-level destination conflicts"
+preflight_root_entries || exit 1
+log_step "Check managed dotfile surface destination conflicts"
 preflight_all_managed_surfaces || exit 1
 
-echo "Creating symbolic links for .dotfiles in $DOTPATH"
+log_section "Link Top-Level Dotfiles"
+log_step "Source: $DOTPATH"
+log_step "Target: $HOME"
 # Link ordinary top-level dotfiles. Tool profile directories are handled below so
 # runtime state such as sessions, caches, and install-state can stay local.
 for f in .??*; do
@@ -405,14 +440,19 @@ done
 
 # Tool roots stay as real HOME directories. Runtime extension collections are
 # symlinked entry-by-entry, while profile-owned package directories remain whole entries.
+log_section "Link Managed Dotfile Surfaces"
 link_all_managed_surfaces || exit 1
 
 # Dotfiles theme support: expose custom oh-my-zsh themes if that installation is present.
+log_section "Link Shell Themes"
 if [ -d "$OH_MY_ZSH_THEMES" ]; then
-    echo "Creating symbolic links for .zsh-theme files in $OH_MY_ZSH_THEMES"
+    log_step "Source: $DOTPATH"
+    log_step "Target: $OH_MY_ZSH_THEMES"
     for theme in "$DOTPATH"/*.zsh-theme; do
-        ln -snfv "$theme" "$OH_MY_ZSH_THEMES/$(basename "$theme")"
+        theme_dest="$OH_MY_ZSH_THEMES/$(basename "$theme")"
+        ln -snf "$theme" "$theme_dest" || exit 1
+        log_link "$theme_dest" "$theme"
     done
 else
-    echo "Directory $OH_MY_ZSH_THEMES does not exist. Skipping theme linking."
+    log_step "Skip: $OH_MY_ZSH_THEMES does not exist"
 fi
