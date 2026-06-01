@@ -149,21 +149,20 @@ add_managed_surface() {
 
 load_branch_surfaces() {
     local branch
-    local hook
+    local script
     local line kind source_dir dest_dir skip_fn label
     local surface_output
 
-    # Profile hooks may opt in by printing tab-separated "surface" rows when
-    # DOTFILES_INSTALL_MODE=surfaces. Normal preflight still runs later.
+    # Surface definition scripts print tab-separated "surface" rows.
     branch=$(git branch --show-current 2>/dev/null || true)
     [ -n "$branch" ] || return 0
 
-    for hook in "$DOTPATH"/scripts/install/preflight.d/*.sh; do
-        [ -f "$hook" ] || continue
+    for script in "$DOTPATH"/scripts/install/preflight.d/*/define-surfaces.sh; do
+        [ -f "$script" ] || continue
         if ! surface_output=$(
-            DOTPATH="$DOTPATH" DOTFILES_BRANCH="$branch" DOTFILES_INSTALL_MODE="surfaces" bash "$hook"
+            DOTPATH="$DOTPATH" DOTFILES_BRANCH="$branch" bash "$script"
         ); then
-            echo "Error: failed to load managed surfaces from $hook" >&2
+            echo "Error: failed to load managed dotfile surfaces from $script" >&2
             return 1
         fi
 
@@ -176,8 +175,8 @@ load_branch_surfaces() {
     done
 }
 
-# Branch-specific preflight scripts opt in by inspecting DOTFILES_BRANCH.
-run_branch_preflight_scripts() {
+# Branch-specific install checks opt in by inspecting DOTFILES_BRANCH.
+run_branch_install_checks() {
     local branch
     local hook
     local rc=0
@@ -185,7 +184,7 @@ run_branch_preflight_scripts() {
     branch=$(git branch --show-current 2>/dev/null || true)
     [ -n "$branch" ] || return 0
 
-    for hook in "$DOTPATH"/scripts/install/preflight.d/*.sh; do
+    for hook in "$DOTPATH"/scripts/install/preflight.d/*/check-*.sh; do
         [ -f "$hook" ] || continue
         echo "Running branch preflight $hook"
         DOTPATH="$DOTPATH" DOTFILES_BRANCH="$branch" bash "$hook" || rc=1
@@ -333,7 +332,7 @@ link_managed_entries() {
         dest="$dest_dir/$name"
 
         # Skip tool-generated state and child collection roots. Child collections
-        # are handled by their own managed surface entries.
+        # are handled by their own managed dotfile surface entries.
         if "$skip_fn" "$name"; then
             echo "Skipping runtime or separately managed entry $f"
             # If an older install linked this skipped entry, remove only that managed link.
@@ -382,7 +381,7 @@ link_all_managed_surfaces() {
 
 echo "Checking for non-managed symlink conflicts"
 load_branch_surfaces || exit 1
-run_branch_preflight_scripts || exit 1
+run_branch_install_checks || exit 1
 
 # Prune stale top-level dotfile symlinks before preflight so branch removals do
 # not turn into false conflicts on the next install run.
@@ -390,7 +389,7 @@ cleanup_managed_symlinks "$DOTPATH" "$HOME" should_skip_root_entry allow-contain
 
 preflight_root_entries || exit 1
 
-# Prune old symlinks for every managed surface before conflict detection. This
+# Prune old symlinks for every managed dotfile surface before conflict detection. This
 # also moves older links toward the current surface layout.
 cleanup_all_managed_surfaces || exit 1
 preflight_all_managed_surfaces || exit 1

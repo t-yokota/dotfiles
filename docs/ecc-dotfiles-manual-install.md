@@ -379,16 +379,16 @@ bash scripts/install/write-profile-ecc-codex-sync-state.sh
 
 ECC の実体を dotfiles 側に受けたあと、実 HOME へは dotfiles の `install.sh` で反映します。
 
-`install.sh` は共通の symlink engine です。実際にどの directory を surface として扱うかは、`scripts/install/preflight.d/*.sh` から読み込みます。この profile では `scripts/install/preflight.d/profile-ecc.sh` が `profile/ecc-base`, `profile/ecc/*` 用の surface 定義を提供します。
+`install.sh` は共通の symlink engine です。実際にどの directory を surface として扱うかは、`scripts/install/preflight.d/*/define-surfaces.sh` から読み込みます。この profile では `scripts/install/preflight.d/ecc/define-surfaces.sh` が `profile/ecc-base`, `profile/ecc/*` 用の surface 定義を提供します。
 
-同じ `profile-ecc.sh` は、symlink 作成前の branch preflight も担当します。`profile/ecc/*` branch では、Claude 側は `~/dotfiles/.claude/ecc/install-state.json`、Codex 側は `~/dotfiles/.codex/dotfiles-profile-ecc-sync-state.json` を確認します。clean clone や別環境で pull した直後にこれらがない場合、実 HOME へ未セットアップの ECC surface を出さないために `install.sh` は停止します。`profile/ecc-base` は install output を持たないため、local state check の対象外です。
+symlink 作成前の branch-specific install check は `scripts/install/preflight.d/*/check-*.sh` から読み込みます。この profile では `scripts/install/preflight.d/ecc/check-local-state.sh` が担当します。`profile/ecc/*` branch では、Claude 側は `~/dotfiles/.claude/ecc/install-state.json`、Codex 側は `~/dotfiles/.codex/dotfiles-profile-ecc-sync-state.json` を確認します。clean clone や別環境で pull した直後にこれらがない場合、実 HOME へ未セットアップの ECC surface を出さないために `install.sh` は停止します。`profile/ecc-base` は install output を持たないため、local state check の対象外です。
 
 ```bash
 cd ~/dotfiles
 bash install.sh
 ```
 
-`profile-ecc.sh` の surface 定義では、`.claude`, `.codex`, `.agents` の root directory を実 HOME 側に残し、その中の desired entry を symlink します。さらに runtime が directory 内の entry を個別に読む collection は一段深く扱い、collection directory 自体ではなく中身を entry 単位で symlink します。
+`scripts/install/preflight.d/ecc/define-surfaces.sh` の surface 定義では、`.claude`, `.codex`, `.agents` の root directory を実 HOME 側に残し、その中の desired entry を symlink します。さらに runtime が directory 内の entry を個別に読む collection は一段深く扱い、collection directory 自体ではなく中身を entry 単位で symlink します。
 
 entry 単位で扱う主な surface:
 
@@ -400,7 +400,7 @@ entry 単位で扱う主な surface:
 - `.codex/prompts`
 - `.agents/skills`
 
-一方で、`.claude/hooks`, `.claude/scripts`, `.claude/mcp-configs` は Claude manual installer が出力する ECC package として扱い、directory 全体を symlink します。これらは `hooks/hooks.json` と `scripts/` の対応関係などが存在し、同じ ECC install output 内で version alignment を保つ方が安全なためです。実 HOME 側に同名の non-managed directory が既にある場合は、`profile-ecc.sh` の preflight が止めます。既存内容が必要な場合は、事前に退避するか dotfiles 側へ統合します。
+一方で、`.claude/hooks`, `.claude/scripts`, `.claude/mcp-configs` は Claude manual installer が出力する ECC package として扱い、directory 全体を symlink します。これらは `hooks/hooks.json` と `scripts/` の対応関係などが存在し、同じ ECC install output 内で version alignment を保つ方が安全なためです。実 HOME 側に同名の non-managed directory が既にある場合は、`check-local-state.sh` の preflight が止めます。既存内容が必要な場合は、事前に退避するか dotfiles 側へ統合します。
 
 `~/.claude/projects`, `~/.codex/auth.json`, sessions, logs, backups, git hooks, install-state などの runtime state は symlink しないため、そのための skip list を持ちます。過去の実行で dotfiles 管理の symlink として貼られていた skipped entry や、branch 切り替えで target がなくなった stale symlink は install.sh が削除します。
 
