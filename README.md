@@ -185,7 +185,7 @@ surface	entries|whole	<source>	<dest>	<skipset-name|none>	<label>
 
 - `entries`: `<source>` directory の entry を `<dest>` directory 内へ個別に symlink します。
 - `whole`: `<source>` の file / directory 自体を `<dest>` へ symlink します。
-- `<source>` は dotfiles checkout からの path、`<dest>` は HOME からの path として解決します。
+- `<source>` は dotfiles checkout からの path、`<dest>` は HOME からの path として解決します。どちらも相対 path として書き、絶対 path や `..` を含む path は invalid として扱います。
 - `<skipset-name>` は `skipsets.tsv` に定義された名前、または skip しない場合の `none` です。
 - `<label>` は install log に出す説明です。space は使えますが、tab は列区切りとして扱います。
 

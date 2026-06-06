@@ -63,6 +63,21 @@ validate_profile_manifest_path() {
     esac
 }
 
+validate_surface_manifest_path() {
+    local file="$1"
+    local line_number="$2"
+    local field_name="$3"
+    local path="$4"
+    local base_name="$5"
+
+    case "$path" in
+        /*|..|../*|*/../*|*/..)
+            manifest_error "$file" "$line_number" "$field_name must be a relative path inside $base_name"
+            return 1
+            ;;
+    esac
+}
+
 validate_profile_manifest_line() {
     local file="$1"
     local line_number="$2"
@@ -160,6 +175,9 @@ validate_surfaces_line() {
         manifest_error "$file" "$line_number" "surface row requires a dest"
         return 1
     fi
+
+    validate_surface_manifest_path "$file" "$line_number" "surface source" "$source_rel" "DOTPATH" || return 1
+    validate_surface_manifest_path "$file" "$line_number" "surface dest" "$dest_rel" "HOME" || return 1
 
     if [ -z "$skipset" ]; then
         manifest_error "$file" "$line_number" "surface row requires a skipset"

@@ -399,6 +399,25 @@ surface	entries	.tool	.tool	missing-skipset	Broken surface" || return 1
     assert_file_contains "$output" "references unknown skipset: missing-skipset" || return 1
 }
 
+test_invalid_surface_path_fails() {
+    local fixture="$TEST_ROOT/invalid-surface-path-fixture"
+    local home="$TEST_ROOT/invalid-surface-path-home"
+    local output="$TEST_ROOT/invalid-surface-path-output.log"
+
+    setup_fixture "$fixture" "$home" || return 1
+    write_file "$fixture/profiles/test/surfaces.tsv" \
+"# kind	strategy	source	dest	skipset	label
+surface	entries	../outside	.tool	tool-root	Broken source path" || return 1
+
+    if run_install "$fixture" "$home" "$TEST_BRANCH" "$output"; then
+        log "Install unexpectedly succeeded despite invalid surface path"
+        return 1
+    fi
+
+    assert_file_contains "$output" "invalid installer manifest" || return 1
+    assert_file_contains "$output" "surface source must be a relative path inside DOTPATH" || return 1
+}
+
 test_help_does_not_install() {
     local fixture="$TEST_ROOT/help-fixture"
     local home="$TEST_ROOT/help-home"
@@ -502,6 +521,7 @@ run_test "profile smoke runner" test_profile_smoke_runner
 run_test "unmanaged entry conflict" test_unmanaged_entry_conflict
 run_test "stale managed symlink cleanup" test_stale_managed_symlink_cleanup
 run_test "invalid manifest fails" test_invalid_manifest_fails
+run_test "invalid surface path fails" test_invalid_surface_path_fails
 run_test "help does not install" test_help_does_not_install
 run_test "unknown option fails" test_unknown_option_fails
 run_test "dry-run does not write" test_dry_run_does_not_write
