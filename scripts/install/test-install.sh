@@ -87,7 +87,7 @@ write_test_profile() {
     local fixture="$1"
     local profile_dir="$fixture/profiles/test"
 
-    mkdir -p "$profile_dir/checks.d" || return 1
+    mkdir -p "$profile_dir" || return 1
     write_file "$profile_dir/profile.tsv" \
 "branch	$TEST_BRANCH
 branch	profile/test/*

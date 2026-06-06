@@ -269,7 +269,7 @@ check_surface_outputs() {
 }
 
 main() {
-    local checks_rel skipsets_rel surfaces_rel
+    local skipsets_rel surfaces_rel
 
     detect_branch || return 1
     log "DOTPATH: $DOTPATH"
@@ -281,10 +281,8 @@ main() {
 
     skipsets_rel=$(profile_manifest_value "$PROFILE_DIR/profile.tsv" "skipsets" "skipsets.tsv")
     surfaces_rel=$(profile_manifest_value "$PROFILE_DIR/profile.tsv" "surfaces" "surfaces.tsv")
-    checks_rel=$(profile_manifest_value "$PROFILE_DIR/profile.tsv" "checks" "checks.d")
     assert_file "$PROFILE_DIR/$skipsets_rel" "skipsets manifest" || return 1
     assert_file "$PROFILE_DIR/$surfaces_rel" "surfaces manifest" || return 1
-    assert_dir "$PROFILE_DIR/$checks_rel" "profile checks directory" || return 1
 
     check_profile_branch_patterns || return 1
     run_installer_fixture || return 1
