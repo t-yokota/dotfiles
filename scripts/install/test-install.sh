@@ -11,6 +11,7 @@ SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 REPO_ROOT=$(cd "$SCRIPT_DIR/../.." && pwd)
 TEST_ROOT=$(mktemp -d "${TMPDIR:-/tmp}/dotfiles-install-test.XXXXXX")
 
+TEST_BRANCH=test/base
 VERBOSE=0
 PASS_COUNT=0
 FAIL_COUNT=0
@@ -73,14 +74,52 @@ write_file() {
     printf '%s\n' "$content" > "$path"
 }
 
+copy_installer_files() {
+    local fixture="$1"
+
+    cp "$REPO_ROOT/install.sh" "$fixture/install.sh" || return 1
+    mkdir -p "$fixture/scripts/install" || return 1
+    cp -R "$REPO_ROOT/scripts/install/lib" "$fixture/scripts/install/lib" || return 1
+}
+
+write_test_profile() {
+    local fixture="$1"
+    local profile_dir="$fixture/profiles/test"
+
+    mkdir -p "$profile_dir" || return 1
+    write_file "$profile_dir/profile.tsv" \
+"branch	$TEST_BRANCH
+skipsets	skipsets.tsv
+surfaces	surfaces.tsv
+checks	checks.d" || return 1
+    write_file "$profile_dir/skipsets.tsv" \
+"# kind	name	pattern
+skipset	tool-root	cache
+skipset	tool-root	sessions
+skipset	tool-root	items
+skipset	tool-root	package
+skipset	tool-root	*.log" || return 1
+    write_file "$profile_dir/surfaces.tsv" \
+"# kind	strategy	source	dest	skipset	label
+surface	entries	.tool	.tool	tool-root	Test tool root
+surface	entries	.tool/items	.tool/items	none	Test tool items
+surface	whole	.tool/package	.tool/package	none	Test tool package" || return 1
+}
+
 make_fixture() {
     local fixture="$1"
 
     mkdir -p "$fixture/profiles" || return 1
-    cp "$REPO_ROOT/install.sh" "$fixture/install.sh" || return 1
-    mkdir -p "$fixture/scripts/install" || return 1
-    cp -R "$REPO_ROOT/scripts/install/lib" "$fixture/scripts/install/lib" || return 1
-    cp -R "$REPO_ROOT/profiles/ecc" "$fixture/profiles/ecc" || return 1
+    copy_installer_files "$fixture" || return 1
+    write_test_profile "$fixture" || return 1
+}
+
+setup_fixture() {
+    local fixture="$1"
+    local home="$2"
+
+    make_fixture "$fixture" || return 1
+    mkdir -p "$home" || return 1
 }
 
 run_install() {
@@ -181,23 +220,23 @@ test_base_profile_entry_links() {
     local home="$TEST_ROOT/base-home"
     local output="$TEST_ROOT/base-output.log"
 
-    make_fixture "$fixture" || return 1
-    mkdir -p "$home" || return 1
+    setup_fixture "$fixture" "$home" || return 1
     write_file "$fixture/.zshrc" "zsh" || return 1
     write_file "$fixture/.gitconfig" "gitconfig" || return 1
     write_file "$fixture/.gitignore" "ignored" || return 1
     write_file "$fixture/.gitconfig.local" "local" || return 1
-    write_file "$fixture/.claude/CLAUDE.md" "claude" || return 1
-    write_file "$fixture/.claude/settings.json" "{}" || return 1
-    write_file "$fixture/.codex/config.toml" "# codex" || return 1
+    write_file "$fixture/.tool/config.toml" "config" || return 1
+    write_file "$fixture/.tool/settings.json" "{}" || return 1
+    write_file "$fixture/.tool/cache/session.json" "{}" || return 1
 
-    run_install "$fixture" "$home" "profile/ecc-base" "$output" || return 1
+    run_install "$fixture" "$home" "$TEST_BRANCH" "$output" || return 1
 
     assert_symlink_target "$home/.zshrc" "$fixture/.zshrc" || return 1
     assert_symlink_target "$home/.gitconfig" "$fixture/.gitconfig" || return 1
-    assert_regular_dir "$home/.claude" || return 1
-    assert_symlink_target "$home/.claude/CLAUDE.md" "$fixture/.claude/CLAUDE.md" || return 1
-    assert_symlink_target "$home/.codex/config.toml" "$fixture/.codex/config.toml" || return 1
+    assert_regular_dir "$home/.tool" || return 1
+    assert_symlink_target "$home/.tool/config.toml" "$fixture/.tool/config.toml" || return 1
+    assert_symlink_target "$home/.tool/settings.json" "$fixture/.tool/settings.json" || return 1
+    assert_absent "$home/.tool/cache" || return 1
     assert_absent "$home/.gitignore" || return 1
     assert_absent "$home/.gitconfig.local" || return 1
 }
@@ -207,21 +246,16 @@ test_whole_surfaces_and_child_entries() {
     local home="$TEST_ROOT/whole-home"
     local output="$TEST_ROOT/whole-output.log"
 
-    make_fixture "$fixture" || return 1
-    mkdir -p "$home" || return 1
-    write_file "$fixture/.claude/hooks/hooks.json" "{}" || return 1
-    write_file "$fixture/.claude/scripts/run.sh" "#!/usr/bin/env bash" || return 1
-    write_file "$fixture/.claude/mcp-configs/server.json" "{}" || return 1
-    write_file "$fixture/.claude/agents/example.md" "agent" || return 1
+    setup_fixture "$fixture" "$home" || return 1
+    write_file "$fixture/.tool/items/example.txt" "item" || return 1
+    write_file "$fixture/.tool/package/manifest.json" "{}" || return 1
 
-    run_install "$fixture" "$home" "profile/ecc-base" "$output" || return 1
+    run_install "$fixture" "$home" "$TEST_BRANCH" "$output" || return 1
 
-    assert_regular_dir "$home/.claude" || return 1
-    assert_regular_dir "$home/.claude/agents" || return 1
-    assert_symlink_target "$home/.claude/agents/example.md" "$fixture/.claude/agents/example.md" || return 1
-    assert_symlink_target "$home/.claude/hooks" "$fixture/.claude/hooks" || return 1
-    assert_symlink_target "$home/.claude/scripts" "$fixture/.claude/scripts" || return 1
-    assert_symlink_target "$home/.claude/mcp-configs" "$fixture/.claude/mcp-configs" || return 1
+    assert_regular_dir "$home/.tool" || return 1
+    assert_regular_dir "$home/.tool/items" || return 1
+    assert_symlink_target "$home/.tool/items/example.txt" "$fixture/.tool/items/example.txt" || return 1
+    assert_symlink_target "$home/.tool/package" "$fixture/.tool/package" || return 1
 }
 
 test_shell_theme_links() {
@@ -229,11 +263,11 @@ test_shell_theme_links() {
     local home="$TEST_ROOT/theme-home"
     local output="$TEST_ROOT/theme-output.log"
 
-    make_fixture "$fixture" || return 1
+    setup_fixture "$fixture" "$home" || return 1
     mkdir -p "$home/.oh-my-zsh/themes" || return 1
     write_file "$fixture/my.zsh-theme" "theme" || return 1
 
-    run_install "$fixture" "$home" "profile/ecc-base" "$output" || return 1
+    run_install "$fixture" "$home" "$TEST_BRANCH" "$output" || return 1
 
     assert_symlink_target "$home/.oh-my-zsh/themes/my.zsh-theme" "$fixture/my.zsh-theme" || return 1
 }
@@ -243,13 +277,13 @@ test_shell_theme_conflict_fails() {
     local home="$TEST_ROOT/theme-conflict-home"
     local output="$TEST_ROOT/theme-conflict-output.log"
 
-    make_fixture "$fixture" || return 1
+    setup_fixture "$fixture" "$home" || return 1
     mkdir -p "$home/.oh-my-zsh/themes" || return 1
     write_file "$fixture/.zshrc" "zsh" || return 1
     write_file "$fixture/my.zsh-theme" "managed theme" || return 1
     write_file "$home/.oh-my-zsh/themes/my.zsh-theme" "local theme" || return 1
 
-    if run_install "$fixture" "$home" "profile/ecc-base" "$output"; then
+    if run_install "$fixture" "$home" "$TEST_BRANCH" "$output"; then
         log "Install unexpectedly succeeded despite shell theme conflict"
         return 1
     fi
@@ -264,9 +298,7 @@ test_check_ordering() {
     local output="$TEST_ROOT/check-output.log"
 
     mkdir -p "$fixture/profiles/order/checks.d" "$home" || return 1
-    cp "$REPO_ROOT/install.sh" "$fixture/install.sh" || return 1
-    mkdir -p "$fixture/scripts/install" || return 1
-    cp -R "$REPO_ROOT/scripts/install/lib" "$fixture/scripts/install/lib" || return 1
+    copy_installer_files "$fixture" || return 1
 
     write_file "$fixture/profiles/order/profile.tsv" \
 "branch	test/check-order
@@ -293,12 +325,12 @@ test_unmanaged_entry_conflict() {
     local home="$TEST_ROOT/conflict-home"
     local output="$TEST_ROOT/conflict-output.log"
 
-    make_fixture "$fixture" || return 1
-    mkdir -p "$home/.claude/agents" || return 1
-    write_file "$fixture/.claude/agents/example.md" "managed agent" || return 1
-    write_file "$home/.claude/agents/example.md" "local agent" || return 1
+    setup_fixture "$fixture" "$home" || return 1
+    mkdir -p "$home/.tool/items" || return 1
+    write_file "$fixture/.tool/items/example.txt" "managed item" || return 1
+    write_file "$home/.tool/items/example.txt" "local item" || return 1
 
-    if run_install "$fixture" "$home" "profile/ecc-base" "$output"; then
+    if run_install "$fixture" "$home" "$TEST_BRANCH" "$output"; then
         log "Install unexpectedly succeeded despite unmanaged conflict"
         return 1
     fi
@@ -311,15 +343,15 @@ test_stale_managed_symlink_cleanup() {
     local home="$TEST_ROOT/stale-home"
     local output="$TEST_ROOT/stale-output.log"
 
-    make_fixture "$fixture" || return 1
-    mkdir -p "$home/.claude/agents" "$fixture/.claude/agents" || return 1
-    write_file "$fixture/.claude/agents/current.md" "current" || return 1
-    ln -s "$fixture/.claude/agents/removed.md" "$home/.claude/agents/removed.md" || return 1
+    setup_fixture "$fixture" "$home" || return 1
+    mkdir -p "$home/.tool/items" "$fixture/.tool/items" || return 1
+    write_file "$fixture/.tool/items/current.txt" "current" || return 1
+    ln -s "$fixture/.tool/items/removed.txt" "$home/.tool/items/removed.txt" || return 1
 
-    run_install "$fixture" "$home" "profile/ecc-base" "$output" || return 1
+    run_install "$fixture" "$home" "$TEST_BRANCH" "$output" || return 1
 
-    assert_absent "$home/.claude/agents/removed.md" || return 1
-    assert_symlink_target "$home/.claude/agents/current.md" "$fixture/.claude/agents/current.md" || return 1
+    assert_absent "$home/.tool/items/removed.txt" || return 1
+    assert_symlink_target "$home/.tool/items/current.txt" "$fixture/.tool/items/current.txt" || return 1
 }
 
 test_invalid_manifest_fails() {
@@ -327,13 +359,12 @@ test_invalid_manifest_fails() {
     local home="$TEST_ROOT/invalid-manifest-home"
     local output="$TEST_ROOT/invalid-manifest-output.log"
 
-    make_fixture "$fixture" || return 1
-    mkdir -p "$home" || return 1
-    write_file "$fixture/profiles/ecc/surfaces.tsv" \
+    setup_fixture "$fixture" "$home" || return 1
+    write_file "$fixture/profiles/test/surfaces.tsv" \
 "# kind	strategy	source	dest	skipset	label
-surface	entries	.claude	.claude	missing-skipset	Broken surface" || return 1
+surface	entries	.tool	.tool	missing-skipset	Broken surface" || return 1
 
-    if run_install "$fixture" "$home" "profile/ecc-base" "$output"; then
+    if run_install "$fixture" "$home" "$TEST_BRANCH" "$output"; then
         log "Install unexpectedly succeeded despite invalid manifest"
         return 1
     fi
@@ -347,11 +378,10 @@ test_help_does_not_install() {
     local home="$TEST_ROOT/help-home"
     local output="$TEST_ROOT/help-output.log"
 
-    make_fixture "$fixture" || return 1
-    mkdir -p "$home" || return 1
+    setup_fixture "$fixture" "$home" || return 1
     write_file "$fixture/.zshrc" "zsh" || return 1
 
-    run_install_args "$fixture" "$home" "profile/ecc-base" "$output" --help || return 1
+    run_install_args "$fixture" "$home" "$TEST_BRANCH" "$output" --help || return 1
 
     assert_file_contains "$output" "Usage: bash install.sh" || return 1
     assert_absent "$home/.zshrc" || return 1
@@ -362,11 +392,10 @@ test_unknown_option_fails() {
     local home="$TEST_ROOT/unknown-option-home"
     local output="$TEST_ROOT/unknown-option-output.log"
 
-    make_fixture "$fixture" || return 1
-    mkdir -p "$home" || return 1
+    setup_fixture "$fixture" "$home" || return 1
     write_file "$fixture/.zshrc" "zsh" || return 1
 
-    if run_install_args "$fixture" "$home" "profile/ecc-base" "$output" --unknown; then
+    if run_install_args "$fixture" "$home" "$TEST_BRANCH" "$output" --unknown; then
         log "Install unexpectedly succeeded despite unsupported option"
         return 1
     fi
@@ -380,21 +409,21 @@ test_dry_run_does_not_write() {
     local home="$TEST_ROOT/dry-run-home"
     local output="$TEST_ROOT/dry-run-output.log"
 
-    make_fixture "$fixture" || return 1
-    mkdir -p "$home/.claude/agents" "$fixture/.claude/agents" || return 1
+    setup_fixture "$fixture" "$home" || return 1
+    mkdir -p "$home/.tool/items" "$fixture/.tool/items" || return 1
     write_file "$fixture/.zshrc" "zsh" || return 1
-    write_file "$fixture/.claude/agents/current.md" "current" || return 1
-    ln -s "$fixture/.claude/agents/removed.md" "$home/.claude/agents/removed.md" || return 1
+    write_file "$fixture/.tool/items/current.txt" "current" || return 1
+    ln -s "$fixture/.tool/items/removed.txt" "$home/.tool/items/removed.txt" || return 1
 
-    run_install_args "$fixture" "$home" "profile/ecc-base" "$output" --dry-run || return 1
+    run_install_args "$fixture" "$home" "$TEST_BRANCH" "$output" --dry-run || return 1
 
     assert_file_contains "$output" "Dry-run mode" || return 1
     assert_file_contains "$output" "Would link" || return 1
     assert_file_contains "$output" "Would remove stale or skipped symlink" || return 1
     assert_file_contains "$output" "no changes were written" || return 1
     assert_absent "$home/.zshrc" || return 1
-    assert_absent "$home/.claude/agents/current.md" || return 1
-    assert_symlink_target "$home/.claude/agents/removed.md" "$fixture/.claude/agents/removed.md" || return 1
+    assert_absent "$home/.tool/items/current.txt" || return 1
+    assert_symlink_target "$home/.tool/items/removed.txt" "$fixture/.tool/items/removed.txt" || return 1
 }
 
 test_short_dry_run_option_does_not_write() {
@@ -402,11 +431,10 @@ test_short_dry_run_option_does_not_write() {
     local home="$TEST_ROOT/short-dry-run-home"
     local output="$TEST_ROOT/short-dry-run-output.log"
 
-    make_fixture "$fixture" || return 1
-    mkdir -p "$home" || return 1
+    setup_fixture "$fixture" "$home" || return 1
     write_file "$fixture/.zshrc" "zsh" || return 1
 
-    run_install_args "$fixture" "$home" "profile/ecc-base" "$output" -n || return 1
+    run_install_args "$fixture" "$home" "$TEST_BRANCH" "$output" -n || return 1
 
     assert_file_contains "$output" "Dry-run mode" || return 1
     assert_absent "$home/.zshrc" || return 1
@@ -417,11 +445,11 @@ test_shell_theme_dry_run_does_not_write() {
     local home="$TEST_ROOT/theme-dry-run-home"
     local output="$TEST_ROOT/theme-dry-run-output.log"
 
-    make_fixture "$fixture" || return 1
+    setup_fixture "$fixture" "$home" || return 1
     mkdir -p "$home/.oh-my-zsh/themes" || return 1
     write_file "$fixture/my.zsh-theme" "theme" || return 1
 
-    run_install_args "$fixture" "$home" "profile/ecc-base" "$output" --dry-run || return 1
+    run_install_args "$fixture" "$home" "$TEST_BRANCH" "$output" --dry-run || return 1
 
     assert_file_contains "$output" "Would link" || return 1
     assert_absent "$home/.oh-my-zsh/themes/my.zsh-theme" || return 1
