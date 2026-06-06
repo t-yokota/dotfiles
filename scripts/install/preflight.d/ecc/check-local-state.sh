@@ -37,14 +37,6 @@ check_file_contains_fixed() {
     fi
 }
 
-is_exact_managed_symlink() {
-    local link_path="$1"
-    local expected_target="$2"
-
-    [ -L "$link_path" ] || return 1
-    [ "$(readlink "$link_path")" = "$expected_target" ]
-}
-
 check_ecc_claude_state() {
     local rc=0
 
@@ -55,35 +47,6 @@ check_ecc_claude_state() {
         echo "Run this from the ECC repo before install.sh:" >&2
         echo "  HOME=\"$DOTPATH\" bash ./install.sh --target claude --profile full" >&2
     fi
-
-    return "$rc"
-}
-
-check_ecc_claude_package_surface() {
-    local rel_path="$1"
-    local source_path="$DOTPATH/$rel_path"
-    local dest_path="$HOME/$rel_path"
-
-    [ -e "$source_path" ] || [ -L "$source_path" ] || return 0
-
-    if [ -e "$dest_path" ] || [ -L "$dest_path" ]; then
-        if ! is_exact_managed_symlink "$dest_path" "$source_path"; then
-            echo "Error: $dest_path already exists, but $rel_path is managed as a whole ECC package directory." >&2
-            echo "Move the existing local path aside, or merge its intended contents into $source_path before rerunning install.sh." >&2
-            return 1
-        fi
-    fi
-}
-
-check_ecc_claude_surfaces() {
-    local rc=0
-
-    # These surfaces are version-aligned ECC package output from the Claude
-    # manual installer. They should be exposed as whole directories, not merged
-    # entry-by-entry with user-local content.
-    check_ecc_claude_package_surface ".claude/hooks" || rc=1
-    check_ecc_claude_package_surface ".claude/scripts" || rc=1
-    check_ecc_claude_package_surface ".claude/mcp-configs" || rc=1
 
     return "$rc"
 }
@@ -124,6 +87,5 @@ check_ecc_codex_state() {
 
 rc=0
 check_ecc_claude_state || rc=1
-check_ecc_claude_surfaces || rc=1
 check_ecc_codex_state || rc=1
 exit "$rc"

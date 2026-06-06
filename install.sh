@@ -5,8 +5,8 @@ if [ -z "${BASH_VERSION:-}" ]; then
     exit 1
 fi
 
-DOTPATH=~/dotfiles
-OH_MY_ZSH_THEMES=~/.oh-my-zsh/themes
+DOTPATH=${DOTPATH:-"$HOME/dotfiles"}
+OH_MY_ZSH_THEMES=${OH_MY_ZSH_THEMES:-"$HOME/.oh-my-zsh/themes"}
 
 cd "$DOTPATH" || { echo "Error: Could not cd to $DOTPATH"; exit 1; }
 
@@ -14,6 +14,8 @@ cd "$DOTPATH" || { echo "Error: Could not cd to $DOTPATH"; exit 1; }
 shopt -s nullglob dotglob
 
 MANAGED_SURFACES=()
+SKIPSET_PATTERNS=()
+RESERVED_ROOT_ENTRIES=()
 
 log_section() {
     printf '\n== %s ==\n' "$1"
@@ -29,6 +31,255 @@ log_substep() {
 
 log_link() {
     printf '    - Link: %s -> %s\n' "$1" "$2"
+}
+
+line_is_ignored() {
+    local line="$1"
+
+    [ -z "$line" ] && return 0
+    case "$line" in
+        \#*) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+get_current_branch() {
+    if [ -n "${DOTFILES_BRANCH:-}" ]; then
+        printf '%s\n' "$DOTFILES_BRANCH"
+        return 0
+    fi
+
+    git branch --show-current 2>/dev/null || true
+}
+
+resolve_dotpath_path() {
+    local path="$1"
+
+    case "$path" in
+        /*) printf '%s\n' "$path" ;;
+        *) printf '%s/%s\n' "$DOTPATH" "${path#./}" ;;
+    esac
+}
+
+resolve_home_path() {
+    local path="$1"
+
+    case "$path" in
+        /*) printf '%s\n' "$path" ;;
+        *) printf '%s/%s\n' "$HOME" "${path#./}" ;;
+    esac
+}
+
+root_entry_for_path() {
+    local path="${1#./}"
+
+    printf '%s\n' "${path%%/*}"
+}
+
+add_reserved_root_entry() {
+    local name="$1"
+    local entry
+
+    [ -n "$name" ] || return 0
+
+    for entry in "${RESERVED_ROOT_ENTRIES[@]}"; do
+        [ "$entry" = "$name" ] && return 0
+    done
+
+    RESERVED_ROOT_ENTRIES+=("$name")
+}
+
+is_reserved_root_entry() {
+    local name="$1"
+    local entry
+
+    for entry in "${RESERVED_ROOT_ENTRIES[@]}"; do
+        [ "$entry" = "$name" ] && return 0
+    done
+
+    return 1
+}
+
+# Repo-local control files are always private to this checkout. Active profile
+# source roots are reserved dynamically from the loaded surface manifest.
+should_skip_root_entry() {
+    case "$1" in
+        .git|.gitignore|.gitconfig.local)
+            return 0
+            ;;
+    esac
+
+    is_reserved_root_entry "$1"
+}
+
+add_skip_pattern() {
+    local skipset="$1"
+    local pattern="$2"
+
+    [ -n "$skipset" ] || return 0
+    [ -n "$pattern" ] || return 0
+    SKIPSET_PATTERNS+=("$skipset"$'\t'"$pattern")
+}
+
+should_skip_entry() {
+    local skipset="$1"
+    local name="$2"
+    local entry set pattern
+
+    [ -n "$skipset" ] || return 1
+    [ "$skipset" = "none" ] && return 1
+
+    for entry in "${SKIPSET_PATTERNS[@]}"; do
+        IFS=$'\t' read -r set pattern <<< "$entry"
+        [ "$set" = "$skipset" ] || continue
+        if [[ "$name" == $pattern ]]; then
+            return 0
+        fi
+    done
+
+    return 1
+}
+
+add_managed_surface() {
+    local strategy="$1"
+    local source_path="$2"
+    local dest_path="$3"
+    local skipset="$4"
+    local label="$5"
+
+    case "$strategy" in
+        entries|whole) ;;
+        *)
+            echo "Error: unknown managed surface strategy: $strategy" >&2
+            return 1
+            ;;
+    esac
+
+    MANAGED_SURFACES+=("$strategy"$'\t'"$source_path"$'\t'"$dest_path"$'\t'"$skipset"$'\t'"$label")
+}
+
+is_surface_source() {
+    local source_path="$1"
+    local surface strategy surface_source dest_path skipset label
+
+    for surface in "${MANAGED_SURFACES[@]}"; do
+        IFS=$'\t' read -r strategy surface_source dest_path skipset label <<< "$surface"
+        [ "$surface_source" = "$source_path" ] && return 0
+    done
+
+    return 1
+}
+
+profile_matches_branch() {
+    local manifest="$1"
+    local branch="$2"
+    local line kind pattern rest
+
+    [ -n "$branch" ] || return 1
+
+    while IFS= read -r line; do
+        line_is_ignored "$line" && continue
+        IFS=$'\t' read -r kind pattern rest <<< "$line"
+        [ "$kind" = "branch" ] || continue
+        if [[ "$branch" == $pattern ]]; then
+            return 0
+        fi
+    done < "$manifest"
+
+    return 1
+}
+
+load_skipsets_file() {
+    local file="$1"
+    local line kind skipset pattern rest
+
+    [ -f "$file" ] || return 0
+    log_substep "$file"
+
+    while IFS= read -r line; do
+        line_is_ignored "$line" && continue
+        IFS=$'\t' read -r kind skipset pattern rest <<< "$line"
+        [ "$kind" = "skip" ] || continue
+        add_skip_pattern "$skipset" "$pattern"
+    done < "$file"
+}
+
+load_surfaces_file() {
+    local file="$1"
+    local line kind strategy source_rel dest_rel skipset label
+    local source_path dest_path root_entry
+
+    [ -f "$file" ] || return 0
+    log_substep "$file"
+
+    while IFS= read -r line; do
+        line_is_ignored "$line" && continue
+        IFS=$'\t' read -r kind strategy source_rel dest_rel skipset label <<< "$line"
+        [ "$kind" = "surface" ] || continue
+
+        source_path=$(resolve_dotpath_path "$source_rel")
+        dest_path=$(resolve_home_path "$dest_rel")
+        add_managed_surface "$strategy" "$source_path" "$dest_path" "$skipset" "$label" || return 1
+
+        root_entry=$(root_entry_for_path "$source_rel")
+        case "$root_entry" in
+            .*) add_reserved_root_entry "$root_entry" ;;
+        esac
+    done < "$file"
+}
+
+load_profile_manifest() {
+    local manifest="$1"
+    local profile_dir="${manifest%/*}"
+    local line kind value rest
+    local surfaces_file="surfaces.tsv"
+    local skipsets_file="skipsets.tsv"
+
+    while IFS= read -r line; do
+        line_is_ignored "$line" && continue
+        IFS=$'\t' read -r kind value rest <<< "$line"
+        case "$kind" in
+            surfaces) surfaces_file="$value" ;;
+            skipsets) skipsets_file="$value" ;;
+        esac
+    done < "$manifest"
+
+    load_skipsets_file "$profile_dir/$skipsets_file" || return 1
+    load_surfaces_file "$profile_dir/$surfaces_file" || return 1
+}
+
+load_active_profile_surfaces() {
+    local branch
+    local manifest
+
+    branch=$(get_current_branch)
+    [ -n "$branch" ] || return 0
+
+    for manifest in "$DOTPATH"/profiles/*/profile.tsv; do
+        [ -f "$manifest" ] || continue
+        if profile_matches_branch "$manifest" "$branch"; then
+            log_substep "Profile: ${manifest%/*}"
+            load_profile_manifest "$manifest" || return 1
+        fi
+    done
+}
+
+# Branch-specific install checks opt in by inspecting DOTFILES_BRANCH.
+run_branch_install_checks() {
+    local branch
+    local hook
+    local rc=0
+
+    branch=$(get_current_branch)
+    [ -n "$branch" ] || return 0
+
+    for hook in "$DOTPATH"/scripts/install/preflight.d/*/check-*.sh; do
+        [ -f "$hook" ] || continue
+        log_substep "$hook"
+        DOTPATH="$DOTPATH" DOTFILES_BRANCH="$branch" bash "$hook" || rc=1
+    done
+
+    return "$rc"
 }
 
 # Only clean symlinks that point back into the managed dotfiles directory.
@@ -48,173 +299,6 @@ is_managed_symlink() {
     esac
 }
 
-# Repo-local control files and tool profile directories are handled separately.
-should_skip_root_entry() {
-    case "$1" in
-        .git|.gitignore|.gitconfig.local|.claude|.codex|.agents)
-            return 0
-            ;;
-        *)
-            return 1
-            ;;
-    esac
-}
-
-# Claude runtime state is machine/session-local, so it stays under ~/.claude.
-should_skip_claude_entry() {
-    case "$1" in
-        # Installer state and Claude runtime/session artifacts stay outside symlink management.
-        ecc|projects|session*|history.jsonl|logs|cache|caches|tmp|statsig|todos|plugins|plugin-cache|.credentials.json|credentials.json|config.json|models_cache.json|session_index.jsonl|*.log|*.db|*.sqlite|*.sqlite-wal|*.sqlite-shm)
-            return 0
-            ;;
-        # Runtime extension collections are managed as their own surfaces below,
-        # so local entries can coexist with dotfiles-managed entries. Profile-owned
-        # package directories such as hooks, scripts, and mcp-configs stay whole here.
-        .agents|agents|commands|rules|skills)
-            return 0
-            ;;
-        *)
-            return 1
-            ;;
-    esac
-}
-
-# Claude's embedded .agents tree contains its own extension collections.
-should_skip_claude_dot_agents_entry() {
-    case "$1" in
-        skills|plugins|logs|backups|cache|caches|tmp|sessions|.credentials.json|credentials.json|config.json|models_cache.json|session_index.jsonl|*.log|*.db|*.sqlite|*.sqlite-wal|*.sqlite-shm)
-            return 0
-            ;;
-        *)
-            return 1
-            ;;
-    esac
-}
-
-# ECC rules and skills use an ecc namespace. Manage that namespace one level
-# deeper so non-ECC local namespaces can sit beside it.
-should_skip_claude_rules_entry() {
-    case "$1" in
-        ecc|logs|backups|cache|caches|tmp|*.log|*.db|*.sqlite|*.sqlite-wal|*.sqlite-shm)
-            return 0
-            ;;
-        *)
-            return 1
-            ;;
-    esac
-}
-
-should_skip_claude_skills_entry() {
-    case "$1" in
-        ecc|logs|backups|cache|caches|tmp|*.log|*.db|*.sqlite|*.sqlite-wal|*.sqlite-shm)
-            return 0
-            ;;
-        *)
-            return 1
-            ;;
-    esac
-}
-
-# Codex auth, sessions, backups, and global hook output should not be symlinked.
-should_skip_codex_entry() {
-    case "$1" in
-        # Codex credentials, session state, backups, and generated hooks are machine-local.
-        auth.json|sessions|logs|backups|git-hooks|ecc-install-state.json|dotfiles-*-sync-state.json|history.jsonl|cache|caches|tmp|plugins|plugin-cache|.credentials.json|credentials.json|config.json|models_cache.json|session_index.jsonl|*.log|*.db|*.sqlite|*.sqlite-wal|*.sqlite-shm)
-            return 0
-            ;;
-        # Codex role and prompt collections are managed one level deeper.
-        agents|prompts)
-            return 0
-            ;;
-        *)
-            return 1
-            ;;
-    esac
-}
-
-# User-level agents state may include skills as desired state plus local runtime data.
-should_skip_agents_entry() {
-    case "$1" in
-        logs|backups|cache|caches|tmp|plugins|plugin-cache|sessions|.credentials.json|credentials.json|config.json|models_cache.json|session_index.jsonl|*.log|*.db|*.sqlite|*.sqlite-wal|*.sqlite-shm)
-            return 0
-            ;;
-        # User-level skills are managed as a collection surface below.
-        skills)
-            return 0
-            ;;
-        *)
-            return 1
-            ;;
-    esac
-}
-
-# Collection surfaces normally have no runtime-state names at their own entry
-# level; each child is a desired file/directory unless a parent skip list catches it.
-should_skip_collection_entry() {
-    return 1
-}
-
-add_managed_surface() {
-    local source_dir="$1"
-    local dest_dir="$2"
-    local skip_fn="$3"
-    local label="$4"
-
-    if ! declare -F "$skip_fn" >/dev/null; then
-        echo "Error: unknown surface skip function: $skip_fn" >&2
-        return 1
-    fi
-
-    MANAGED_SURFACES+=("$source_dir"$'\t'"$dest_dir"$'\t'"$skip_fn"$'\t'"$label")
-}
-
-load_branch_surfaces() {
-    local branch
-    local script
-    local line kind source_dir dest_dir skip_fn label
-    local surface_output
-
-    # Surface definition scripts print tab-separated "surface" rows.
-    branch=$(git branch --show-current 2>/dev/null || true)
-    [ -n "$branch" ] || return 0
-
-    for script in "$DOTPATH"/scripts/install/preflight.d/*/define-surfaces.sh; do
-        [ -f "$script" ] || continue
-        log_substep "$script"
-        if ! surface_output=$(
-            DOTPATH="$DOTPATH" DOTFILES_BRANCH="$branch" bash "$script"
-        ); then
-            echo "Error: failed to load managed dotfile surfaces from $script" >&2
-            return 1
-        fi
-
-        while IFS= read -r line; do
-            [ -n "$line" ] || continue
-            IFS=$'\t' read -r kind source_dir dest_dir skip_fn label <<< "$line"
-            [ "$kind" = "surface" ] || continue
-            add_managed_surface "$source_dir" "$dest_dir" "$skip_fn" "$label" || return 1
-        done <<< "$surface_output"
-    done
-}
-
-# Branch-specific install checks opt in by inspecting DOTFILES_BRANCH.
-run_branch_install_checks() {
-    local branch
-    local hook
-    local rc=0
-
-    branch=$(git branch --show-current 2>/dev/null || true)
-    [ -n "$branch" ] || return 0
-
-    for hook in "$DOTPATH"/scripts/install/preflight.d/*/check-*.sh; do
-        [ -f "$hook" ] || continue
-        log_substep "$hook"
-        DOTPATH="$DOTPATH" DOTFILES_BRANCH="$branch" bash "$hook" || rc=1
-    done
-
-    return "$rc"
-}
-
 # Detect conflicts before linking so install.sh does not partially apply a profile.
 check_managed_entry() {
     local dest_path="$1"
@@ -229,7 +313,7 @@ check_managed_entry() {
     fi
 }
 
-# Managed surfaces write links inside this container. It must be absent or a real
+# Entry surfaces write links inside this container. It must be absent or a real
 # directory; writing through an unrelated symlink would cross ownership boundaries.
 check_destination_container() {
     local dest_dir="$1"
@@ -247,8 +331,27 @@ check_destination_container() {
     fi
 }
 
-# Check ordinary top-level dotfiles before writing; managed tool directories are
-# skipped here because their contents need per-entry runtime-state filtering.
+check_whole_destination_parent() {
+    local dest_path="$1"
+    local parent="${dest_path%/*}"
+
+    [ "$parent" = "$dest_path" ] && parent="."
+
+    if [ -L "$parent" ]; then
+        echo "Error: $parent is a symlink, but this profile manages a whole entry inside it." >&2
+        echo "Move or replace it with a real directory before rerunning install.sh." >&2
+        return 1
+    fi
+
+    if [ -e "$parent" ] && [ ! -d "$parent" ]; then
+        echo "Error: $parent already exists and is not a directory." >&2
+        echo "Move or merge it before rerunning install.sh." >&2
+        return 1
+    fi
+}
+
+# Check ordinary top-level dotfiles before writing; active profile roots are
+# skipped here because their contents need profile-specific surface handling.
 preflight_root_entries() {
     local f name
 
@@ -266,7 +369,7 @@ preflight_root_entries() {
 preflight_managed_entries() {
     local source_dir="$1"
     local dest_dir="$2"
-    local skip_fn="$3"
+    local skipset="$3"
     local f name
 
     check_destination_container "$dest_dir" || return 1
@@ -274,10 +377,20 @@ preflight_managed_entries() {
     for f in "$source_dir"/*; do
         [ -e "$f" ] || [ -L "$f" ] || continue
         name=$(basename "$f")
-        "$skip_fn" "$name" && continue
+        should_skip_entry "$skipset" "$name" && continue
 
         check_managed_entry "$dest_dir/$name" "$source_dir" || return 1
     done
+}
+
+preflight_whole_surface() {
+    local source_path="$1"
+    local dest_path="$2"
+
+    [ -e "$source_path" ] || [ -L "$source_path" ] || return 0
+
+    check_whole_destination_parent "$dest_path" || return 1
+    check_managed_entry "$dest_path" "$source_path" || return 1
 }
 
 # Replace only symlinks owned by this dotfiles checkout; never write inside
@@ -299,9 +412,9 @@ link_managed_entry() {
 cleanup_managed_symlinks() {
     local source_dir="$1"
     local dest_dir="$2"
-    local skip_fn="$3"
+    local skipset="$3"
     local container_policy="${4:-strict}"
-    local name dest target
+    local name dest target child_source
 
     if [ "$container_policy" != "allow-container-symlink" ] && [ -L "$dest_dir" ]; then
         if is_managed_symlink "$dest_dir" "$source_dir"; then
@@ -324,10 +437,45 @@ cleanup_managed_symlinks() {
 
         if is_managed_symlink "$dest" "$source_dir"; then
             target=$(readlink "$dest")
+            child_source="$source_dir/$name"
             # Remove links whose source disappeared after a branch switch, or links that are
-            # now classified as runtime state by the skip list.
-            if [ ! -e "$target" ] || "$skip_fn" "$name"; then
+            # now classified as runtime state by this surface and are not handled by a child surface.
+            if [ ! -e "$target" ] || { should_skip_entry "$skipset" "$name" && ! is_surface_source "$child_source"; }; then
                 log_substep "Remove stale or skipped symlink: $dest"
+                rm -f "$dest"
+            fi
+        fi
+    done
+}
+
+cleanup_whole_surface() {
+    local source_path="$1"
+    local dest_path="$2"
+    local target
+
+    if is_managed_symlink "$dest_path" "$source_path"; then
+        target=$(readlink "$dest_path")
+        if [ ! -e "$target" ]; then
+            log_substep "Remove stale whole-entry symlink: $dest_path"
+            rm -f "$dest_path"
+        fi
+    fi
+}
+
+cleanup_root_symlinks() {
+    local dest name target
+
+    [ -d "$HOME" ] || return 0
+
+    for dest in "$HOME"/*; do
+        # Broken symlinks fail -e, so keep the -L check.
+        [ -e "$dest" ] || [ -L "$dest" ] || continue
+        name=$(basename "$dest")
+
+        if is_managed_symlink "$dest" "$DOTPATH"; then
+            target=$(readlink "$dest")
+            if [ ! -e "$target" ] || should_skip_root_entry "$name"; then
+                log_substep "Remove stale or reserved top-level symlink: $dest"
                 rm -f "$dest"
             fi
         fi
@@ -338,8 +486,8 @@ cleanup_managed_symlinks() {
 link_managed_entries() {
     local source_dir="$1"
     local dest_dir="$2"
-    local skip_fn="$3"
-    local f name dest
+    local skipset="$3"
+    local f name dest child_source
 
     check_destination_container "$dest_dir" || return 1
 
@@ -347,19 +495,20 @@ link_managed_entries() {
     mkdir -p "$dest_dir"
 
     # Cleanup pass: prune only symlinks that this script owns.
-    cleanup_managed_symlinks "$source_dir" "$dest_dir" "$skip_fn" || return 1
+    cleanup_managed_symlinks "$source_dir" "$dest_dir" "$skipset" || return 1
 
     for f in "$source_dir"/*; do
         [ -e "$f" ] || [ -L "$f" ] || continue
         name=$(basename "$f")
         dest="$dest_dir/$name"
+        child_source="$source_dir/$name"
 
-        # Skip tool-generated state and child collection roots. Child collections
-        # are handled by their own managed dotfile surface entries.
-        if "$skip_fn" "$name"; then
+        # Skip tool-generated state and child surfaces. Child surfaces are linked
+        # by their own manifest rows.
+        if should_skip_entry "$skipset" "$name"; then
             log_substep "Skip runtime or separately managed entry: $f"
             # If an older install linked this skipped entry, remove only that managed link.
-            if is_managed_symlink "$dest" "$source_dir"; then
+            if is_managed_symlink "$dest" "$source_dir" && ! is_surface_source "$child_source"; then
                 rm -f "$dest"
             fi
             continue
@@ -370,43 +519,69 @@ link_managed_entries() {
     done
 }
 
-cleanup_all_managed_surfaces() {
-    local surface source_dir dest_dir skip_fn label
+link_whole_surface() {
+    local source_path="$1"
+    local dest_path="$2"
+    local parent="${dest_path%/*}"
 
-    # Cleanup runs in the order provided by profile hooks. Parent surfaces should
+    [ -e "$source_path" ] || [ -L "$source_path" ] || return 0
+
+    check_whole_destination_parent "$dest_path" || return 1
+    mkdir -p "$parent"
+    link_managed_entry "$source_path" "$dest_path" "$source_path" || return 1
+}
+
+cleanup_all_managed_surfaces() {
+    local surface strategy source_path dest_path skipset label
+
+    # Cleanup runs in the order provided by profile manifests. Parent surfaces should
     # come before child collections so old whole-directory links are pruned first.
     for surface in "${MANAGED_SURFACES[@]}"; do
-        IFS=$'\t' read -r source_dir dest_dir skip_fn label <<< "$surface"
-        cleanup_managed_symlinks "$source_dir" "$dest_dir" "$skip_fn" || return 1
+        IFS=$'\t' read -r strategy source_path dest_path skipset label <<< "$surface"
+        case "$strategy" in
+            entries) cleanup_managed_symlinks "$source_path" "$dest_path" "$skipset" || return 1 ;;
+            whole) cleanup_whole_surface "$source_path" "$dest_path" || return 1 ;;
+        esac
     done
 }
 
 preflight_all_managed_surfaces() {
-    local surface source_dir dest_dir skip_fn label
+    local surface strategy source_path dest_path skipset label
 
     for surface in "${MANAGED_SURFACES[@]}"; do
-        IFS=$'\t' read -r source_dir dest_dir skip_fn label <<< "$surface"
-        [ -d "$source_dir" ] || continue
-        preflight_managed_entries "$source_dir" "$dest_dir" "$skip_fn" || return 1
+        IFS=$'\t' read -r strategy source_path dest_path skipset label <<< "$surface"
+        case "$strategy" in
+            entries)
+                [ -d "$source_path" ] || continue
+                preflight_managed_entries "$source_path" "$dest_path" "$skipset" || return 1
+                ;;
+            whole)
+                preflight_whole_surface "$source_path" "$dest_path" || return 1
+                ;;
+        esac
     done
 }
 
 link_all_managed_surfaces() {
-    local surface source_dir dest_dir skip_fn label
+    local surface strategy source_path dest_path skipset label
 
     for surface in "${MANAGED_SURFACES[@]}"; do
-        IFS=$'\t' read -r source_dir dest_dir skip_fn label <<< "$surface"
-        [ -d "$source_dir" ] || continue
+        IFS=$'\t' read -r strategy source_path dest_path skipset label <<< "$surface"
+        [ -e "$source_path" ] || [ -L "$source_path" ] || continue
         log_step "$label"
-        log_substep "Source: $source_dir"
-        log_substep "Target: $dest_dir"
-        link_managed_entries "$source_dir" "$dest_dir" "$skip_fn" || return 1
+        log_substep "Strategy: $strategy"
+        log_substep "Source: $source_path"
+        log_substep "Target: $dest_path"
+        case "$strategy" in
+            entries) link_managed_entries "$source_path" "$dest_path" "$skipset" || return 1 ;;
+            whole) link_whole_surface "$source_path" "$dest_path" || return 1 ;;
+        esac
     done
 }
 
 log_section "Preflight"
-log_step "Load managed dotfile surface definitions"
-load_branch_surfaces || exit 1
+log_step "Load active profile surface manifests"
+load_active_profile_surfaces || exit 1
 log_step "Run branch-specific install checks"
 run_branch_install_checks || exit 1
 
@@ -414,7 +589,7 @@ log_section "Cleanup"
 # Prune stale top-level dotfile symlinks before preflight so branch removals do
 # not turn into false conflicts on the next install run.
 log_step "Prune stale top-level symlinks"
-cleanup_managed_symlinks "$DOTPATH" "$HOME" should_skip_root_entry allow-container-symlink || exit 1
+cleanup_root_symlinks || exit 1
 
 # Prune old symlinks for every managed dotfile surface before conflict detection. This
 # also moves older links toward the current surface layout.
@@ -430,8 +605,8 @@ preflight_all_managed_surfaces || exit 1
 log_section "Link Top-Level Dotfiles"
 log_step "Source: $DOTPATH"
 log_step "Target: $HOME"
-# Link ordinary top-level dotfiles. Tool profile directories are handled below so
-# runtime state such as sessions, caches, and install-state can stay local.
+# Link ordinary top-level dotfiles. Profile roots are handled below so runtime
+# state such as sessions, caches, and install-state can stay local.
 for f in .??*; do
     [ -e "$f" ] || [ -L "$f" ] || continue
     should_skip_root_entry "$(basename "$f")" && continue
@@ -439,7 +614,7 @@ for f in .??*; do
 done
 
 # Tool roots stay as real HOME directories. Runtime extension collections are
-# symlinked entry-by-entry, while profile-owned package directories remain whole entries.
+# symlinked entry-by-entry, while profile-owned package directories can be linked whole.
 log_section "Link Managed Dotfile Surfaces"
 link_all_managed_surfaces || exit 1
 

@@ -1,0 +1,19 @@
+# kind	strategy	source	dest	skipset	label
+surface	entries	.claude	.claude	claude-root	Claude Code root config
+surface	entries	.claude/.agents	.claude/.agents	claude-dot-agents	Claude embedded agent root
+surface	entries	.claude/.agents/plugins	.claude/.agents/plugins	none	Claude embedded agent plugins
+surface	entries	.claude/.agents/skills	.claude/.agents/skills	none	Claude embedded agent skills
+surface	entries	.claude/agents	.claude/agents	none	Claude agents
+surface	entries	.claude/commands	.claude/commands	none	Claude commands
+surface	entries	.claude/rules	.claude/rules	claude-rules-root	Claude rules root
+surface	entries	.claude/rules/ecc	.claude/rules/ecc	none	Claude ECC rules
+surface	entries	.claude/skills	.claude/skills	claude-skills-root	Claude skills root
+surface	entries	.claude/skills/ecc	.claude/skills/ecc	none	Claude ECC skills
+surface	whole	.claude/hooks	.claude/hooks	none	Claude hooks package
+surface	whole	.claude/scripts	.claude/scripts	none	Claude scripts package
+surface	whole	.claude/mcp-configs	.claude/mcp-configs	none	Claude MCP configs package
+surface	entries	.codex	.codex	codex-root	Codex root config
+surface	entries	.codex/agents	.codex/agents	none	Codex agent roles
+surface	entries	.codex/prompts	.codex/prompts	none	Codex prompts
+surface	entries	.agents	.agents	agents-root	user-level agent root
+surface	entries	.agents/skills	.agents/skills	none	user-level Codex skills
