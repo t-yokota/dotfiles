@@ -6,7 +6,7 @@
 set -u
 
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
-DOTPATH=${DOTPATH:-$(cd "$SCRIPT_DIR/../.." && pwd)}
+DOTPATH=${DOTPATH:-$(cd "$SCRIPT_DIR/../../.." && pwd)}
 STATE_OWNER="dotfiles.profile-ecc.codex-sync"
 STATE_FILE="$DOTPATH/.codex/dotfiles-profile-ecc-sync-state.json"
 
@@ -66,13 +66,15 @@ if ! command -v node >/dev/null 2>&1; then
     exit 1
 fi
 
-if ! DOTPATH=$(cd "$DOTPATH" && pwd); then
-    fail "DOTPATH does not exist: $DOTPATH"
+dotpath_input="$DOTPATH"
+if ! DOTPATH=$(cd "$dotpath_input" 2>/dev/null && pwd); then
+    fail "DOTPATH does not exist: $dotpath_input"
     exit 1
 fi
 
-if ! ECC_REPO=$(cd "$ECC_REPO" && pwd); then
-    fail "ECC_REPO does not exist: $ECC_REPO"
+ecc_repo_input="$ECC_REPO"
+if ! ECC_REPO=$(cd "$ecc_repo_input" 2>/dev/null && pwd); then
+    fail "ECC_REPO does not exist: $ecc_repo_input"
     exit 1
 fi
 

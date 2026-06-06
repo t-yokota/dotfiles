@@ -79,7 +79,7 @@ check_ecc_codex_state() {
         echo "  mkdir -p \"$DOTPATH/.agents/skills\"" >&2
         echo "  cp -R \"\$ECC_REPO/.agents/skills/.\" \"$DOTPATH/.agents/skills/\"" >&2
         echo "  DOTPATH=\"$DOTPATH\" ECC_REPO=\"\$ECC_REPO\" \\" >&2
-        echo "  bash \"$DOTPATH/scripts/install/write-profile-ecc-codex-sync-state.sh\"" >&2
+        echo "  bash \"$DOTPATH/profiles/ecc/bin/write-codex-sync-state.sh\"" >&2
     fi
 
     return "$rc"

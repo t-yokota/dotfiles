@@ -80,10 +80,12 @@ profiles/<name>/skipsets.tsv
 branch 固有の check は、profile branch を安全に適用できる状態かを確認するための仕組みです。次の形式でファイルを追加できます。
 
 ```text
-scripts/install/preflight.d/*/check-*.sh
+profiles/<name>/checks.d/*.sh
 ```
 
-これらの check は symlink 作成前に実行されます。profile branch に必要な local install state がない場合や、実 HOME 側に危険な競合がある場合は、ここで停止させます。
+`profile.tsv` で branch pattern に一致した active profile の check だけが、symlink 作成前に実行されます。check は file name の glob 順、つまり通常は辞書順で実行されます。順序を明示したい場合は、`10-local-state.sh`, `20-conflicts.sh` のように番号 prefix を付けます。
+
+profile branch に必要な local install state がない場合や、実 HOME 側に危険な競合がある場合は、ここで停止させます。
 
 たとえば ECC のように外部 installer や sync step を先に実行してから HOME側に適用する profile では、その install-state や local marker の存在をここで確認します。check script は、現在の環境でこの branch を適用する準備が整っているかを判定するためのもので、確認内容は profile に応じて決定できます。
 

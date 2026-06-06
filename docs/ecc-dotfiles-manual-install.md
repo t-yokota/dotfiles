@@ -366,13 +366,13 @@ cp -R "$ECC_REPO/.agents/skills/." .agents/skills/
 git diff -- .agents/skills
 ```
 
-Claude manual installer には `.claude/ecc/install-state.json` がありますが、今回使う Codex sync route には同等の install-state がありません。最後に `scripts/install/write-profile-ecc-codex-sync-state.sh` を実行し、Codex sync output と skills bundle を確認済みであることを示す local marker を作ります。この marker は実行履歴ではなく、現時点の dotfiles / ECC repo / generated output を検査して書く snapshot です。
+Claude manual installer には `.claude/ecc/install-state.json` がありますが、今回使う Codex sync route には同等の install-state がありません。最後に `profiles/ecc/bin/write-codex-sync-state.sh` を実行し、Codex sync output と skills bundle を確認済みであることを示す local marker を作ります。この marker は実行履歴ではなく、現時点の dotfiles / ECC repo / generated output を検査して書く snapshot です。
 
 手動で sync / copy を個別実行した場合でも、最後にこの marker を作れば `install.sh` の `profile/ecc/*` preflight が通る状態になります。
 
 ```bash
 DOTPATH="$DOTPATH" ECC_REPO="$ECC_REPO" \
-bash scripts/install/write-profile-ecc-codex-sync-state.sh
+bash profiles/ecc/bin/write-codex-sync-state.sh
 ```
 
 ## 9. dotfiles の install.sh で実 HOME へ symlink する
@@ -381,7 +381,7 @@ ECC の実体を dotfiles 側に受けたあと、実 HOME へは dotfiles の `
 
 `install.sh` は共通の symlink engine です。実際にどの directory を surface として扱うかは、`profiles/*/profile.tsv` と、その profile が指す `surfaces.tsv`, `skipsets.tsv` から読み込みます。この profile では `profiles/ecc/` が `profile/ecc-base`, `profile/ecc/*` 用の surface 定義を提供します。
 
-symlink 作成前の branch-specific install check は `scripts/install/preflight.d/*/check-*.sh` から読み込みます。この profile では `scripts/install/preflight.d/ecc/check-local-state.sh` が担当します。`profile/ecc/*` branch では、Claude 側は `~/dotfiles/.claude/ecc/install-state.json`、Codex 側は `~/dotfiles/.codex/dotfiles-profile-ecc-sync-state.json` を確認します。clean clone や別環境で pull した直後にこれらがない場合、実 HOME へ未セットアップの ECC surface を出さないために `install.sh` は停止します。`profile/ecc-base` は install output を持たないため、local state check の対象外です。
+symlink 作成前の branch-specific install check は、active profile の `checks.d/*.sh` から file name の glob 順で読み込みます。この profile では `profiles/ecc/checks.d/10-local-state.sh` が担当します。`profile/ecc/*` branch では、Claude 側は `~/dotfiles/.claude/ecc/install-state.json`、Codex 側は `~/dotfiles/.codex/dotfiles-profile-ecc-sync-state.json` を確認します。clean clone や別環境で pull した直後にこれらがない場合、実 HOME へ未セットアップの ECC surface を出さないために `install.sh` は停止します。`profile/ecc-base` は install output を持たないため、local state check の対象外です。
 
 ```bash
 cd ~/dotfiles
@@ -493,7 +493,7 @@ cleanup の考え方は次です。
 - `.codex/config.toml` は add-only merge なので、自動逆変換せず、ECC baseline / MCP sections を手動で削るか、Git の履歴から戻す。
 - `.codex/agents/*.toml` と `.codex/prompts/ecc-*` は generated output として cleanup / regenerate する。
 - `.codex/backups/` は local backup であり、uninstall contract ではない。
-- `.codex/dotfiles-profile-ecc-sync-state.json` は local marker なので、Codex sync output を cleanup / regenerate する場合は先に削除する。sync output と skills bundle を再生成したあと、`scripts/install/write-profile-ecc-codex-sync-state.sh` で作り直す。
+- `.codex/dotfiles-profile-ecc-sync-state.json` は local marker なので、Codex sync output を cleanup / regenerate する場合は先に削除する。sync output と skills bundle を再生成したあと、`profiles/ecc/bin/write-codex-sync-state.sh` で作り直す。
 
 Codex sync は existing agent role file を上書きせず、古い `ecc-*.md` prompt を自動削除しません。upstream 更新を取り直す場合は、manifest と prefix を基準に古い生成物を削除してから再 sync します。
 
@@ -537,7 +537,7 @@ sync output と skills bundle を確認したら、local marker を作り直し�
 cd "$DOTPATH"
 
 DOTPATH="$DOTPATH" ECC_REPO="$ECC_REPO" \
-bash scripts/install/write-profile-ecc-codex-sync-state.sh
+bash profiles/ecc/bin/write-codex-sync-state.sh
 ```
 
 ### Codex skills bundle を update / regenerate する

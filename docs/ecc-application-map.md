@@ -236,8 +236,8 @@ The examples in this document use `ECC_REPO=/path/to/everything-claude-code`.
 - Codex installer target: `$ECC_REPO/scripts/lib/install-targets/codex-home.js`
 - Codex sync script: `$ECC_REPO/scripts/sync-ecc-to-codex.sh`
 - dotfiles install surface definition: `profiles/ecc/surfaces.tsv`, `profiles/ecc/skipsets.tsv`
-- dotfiles install preflight: `scripts/install/preflight.d/ecc/check-local-state.sh`
-- dotfiles Codex sync marker writer: `scripts/install/write-profile-ecc-codex-sync-state.sh`
+- dotfiles install preflight: `profiles/ecc/checks.d/10-local-state.sh`
+- dotfiles Codex sync marker writer: `profiles/ecc/bin/write-codex-sync-state.sh`
 - Claude plugin manifest: `$ECC_REPO/.claude-plugin/plugin.json`
 - Codex plugin manifest: `$ECC_REPO/.codex-plugin/plugin.json`
 

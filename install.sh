@@ -16,6 +16,7 @@ shopt -s nullglob dotglob
 MANAGED_SURFACES=()
 SKIPSET_PATTERNS=()
 RESERVED_ROOT_ENTRIES=()
+ACTIVE_PROFILE_CHECK_DIRS=()
 
 log_section() {
     printf '\n== %s ==\n' "$1"
@@ -234,6 +235,7 @@ load_profile_manifest() {
     local line kind value rest
     local surfaces_file="surfaces.tsv"
     local skipsets_file="skipsets.tsv"
+    local checks_dir="checks.d"
 
     while IFS= read -r line; do
         line_is_ignored "$line" && continue
@@ -241,14 +243,16 @@ load_profile_manifest() {
         case "$kind" in
             surfaces) surfaces_file="$value" ;;
             skipsets) skipsets_file="$value" ;;
+            checks) checks_dir="$value" ;;
         esac
     done < "$manifest"
 
+    ACTIVE_PROFILE_CHECK_DIRS+=("$profile_dir/$checks_dir")
     load_skipsets_file "$profile_dir/$skipsets_file" || return 1
     load_surfaces_file "$profile_dir/$surfaces_file" || return 1
 }
 
-load_active_profile_surfaces() {
+load_active_profile_manifests() {
     local branch
     local manifest
 
@@ -264,19 +268,26 @@ load_active_profile_surfaces() {
     done
 }
 
-# Branch-specific install checks opt in by inspecting DOTFILES_BRANCH.
-run_branch_install_checks() {
+run_active_profile_install_checks() {
     local branch
+    local checks_dir
     local hook
     local rc=0
 
     branch=$(get_current_branch)
     [ -n "$branch" ] || return 0
 
-    for hook in "$DOTPATH"/scripts/install/preflight.d/*/check-*.sh; do
-        [ -f "$hook" ] || continue
-        log_substep "$hook"
-        DOTPATH="$DOTPATH" DOTFILES_BRANCH="$branch" bash "$hook" || rc=1
+    for checks_dir in "${ACTIVE_PROFILE_CHECK_DIRS[@]}"; do
+        [ -d "$checks_dir" ] || continue
+        for hook in "$checks_dir"/*.sh; do
+            [ -f "$hook" ] || continue
+            case "$(basename "$hook")" in
+                check-*.sh|[0-9][0-9]-*.sh) ;;
+                *) continue ;;
+            esac
+            log_substep "$hook"
+            DOTPATH="$DOTPATH" DOTFILES_BRANCH="$branch" bash "$hook" || rc=1
+        done
     done
 
     return "$rc"
@@ -580,10 +591,10 @@ link_all_managed_surfaces() {
 }
 
 log_section "Preflight"
-log_step "Load active profile surface manifests"
-load_active_profile_surfaces || exit 1
-log_step "Run branch-specific install checks"
-run_branch_install_checks || exit 1
+log_step "Load active profile manifests"
+load_active_profile_manifests || exit 1
+log_step "Run active profile install checks"
+run_active_profile_install_checks || exit 1
 
 log_section "Cleanup"
 # Prune stale top-level dotfile symlinks before preflight so branch removals do
