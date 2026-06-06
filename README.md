@@ -2,25 +2,78 @@
 
 個人用 dotfiles です。共通で使う設定は `main` に置き、特定のツール構成や生成物が必要な場合は profile branch で管理します。
 
-## インストール
+このリポジトリは単なる設定ファイルの置き場ではなく、自分の作業環境で様々なポリシーを切り替えながら試すことができる土台になっています。<br>特に AI agent のツールはベストプラクティスが変わり続ける可能性があるため、ベースは薄く保ち、特定ツールとの連携や agent profile 自体は branch と manifest の単位で切りながら扱います。
 
-適用したい branch を checkout した状態で、Bash から installer を実行します。
+`.claude/`, `.codex/`, `.agents/` のようなディレクトリは、ディレクトリの root 全体を HOME に symlink しません。credential、cache、session などの runtime state は実 HOME 側に残した上で、再現したい desired state だけを managed surface で管理します。<br>これにより、ベストプラクティスへの追従、複数の policy の切り替え、試行錯誤を git の履歴として扱えるようにします。
+
+## Branch Strategy
+
+`main` は portable な base branch です。共通 dotfiles、共通 installer、共通 ignore rule を置きます。特定環境で生成された tool output や local install state は含めません。<br>profile branch は、top-level dotfile だけでは足りない構成を扱うために使います。profile manifest、branch-specific check、手順書、ツールの desired state などを追加できます。
+
+基本形は次のようにします。
+
+```text
+main
+profile/<name>-base
+profile/<name>/<environment>
+```
+
+`*-base` branch は profile の共通構造と手順を置くための branch です。できるだけ portable に保ちます。local path を含む生成物や machine-local な sync marker が必要な場合は、base branch から環境別 branch を切って、その branch で tool installer を実行します。<br>たとえば ECC profile では、`profile/ecc-base` に installer 連携や手順を置き、実際の Claude / Codex 生成物や local sync marker は `profile/ecc/<environment>` 側で管理します。
+
+## Repository Layout
+
+この repository は、portable な top-level dotfiles、共通 installer、profile branch 固有の manifest / check / 補助 script を分けて管理します。
+
+```text
+.
+├── install.sh
+├── scripts/
+│   └── install/
+│       ├── lib/
+│       │   ├── common.sh
+│       │   ├── profile.sh
+│       │   └── reconcile.sh
+│       └── test-install.sh
+├── profiles/
+│   └── <name>/
+│       ├── profile.tsv
+│       ├── surfaces.tsv
+│       ├── skipsets.tsv
+│       ├── checks.d/
+│       └── bin/
+├── docs/
+├── .claude/ .codex/ .agents/
+└── *.zsh-theme
+```
+
+主な役割は次の通りです。
+
+- `install.sh`: 共通 installer の entrypoint です。CLI option、`DOTPATH` / `HOME` の初期化、library 読み込み、install phase の実行順だけを持ちます。
+- `scripts/install/lib/common.sh`: 共通 helper です。log 出力、dry-run 判定、branch 取得、path 解決など、profile policy を持たない処理を置きます。
+- `scripts/install/lib/profile.sh`: profile manifest loader です。現在の branch に合う profile を選び、`profile.tsv`, `surfaces.tsv`, `skipsets.tsv` を検証して installer state に読み込み、profile 固有 check を実行します。
+- `scripts/install/lib/reconcile.sh`: desired state と HOME の actual state を突き合わせる engine です。未管理 path の conflict check、dotfiles 管理 symlink の cleanup、top-level dotfile / managed surface / shell theme の symlink 作成を担当します。
+- `scripts/install/test-install.sh`: installer の regression test です。`/tmp` に一時的な dotfiles checkout と HOME を作り、実 HOME を触らずに install / dry-run / conflict / cleanup / manifest validation を確認します。
+- `profiles/<name>/`: profile branch 固有の定義です。surface、skipset、branch-specific check、profile 補助 script をここに置きます。
+- `.claude/`, `.codex/`, `.agents/`: profile が HOME に出す tool 用 desired state です。root directory ごと symlink するのではなく、profile manifest の surface 定義に従って扱います。
+- `docs/`: profile の背景、手順、外部 tool との対応関係など、README に収めない長めの補足を置きます。
+
+## Install
+
+適用したい branch を checkout した状態で、Bash から installer を実行します。<br>`install.sh` は Bash 前提です。`sh install.sh` では実行せず、誤って Bash 以外から起動された場合は早期に終了します。
 
 ```bash
 cd ~/dotfiles
 bash install.sh
 ```
 
-`install.sh` は Bash 前提です。`sh install.sh` では実行せず、誤って Bash 以外から起動された場合は早期に終了します。
-
-実際に symlink を作る前に確認したい場合は、`--dry-run` または短縮形の `-n` を使います。profile manifest、branch-specific check、cleanup 対象、link conflict、作成予定の symlink を確認しますが、共通 installer は directory 作成、symlink 作成、cleanup を書き込みません。
+実際に symlink を作る前に確認したい場合は、`--dry-run` または短縮形の `-n` を使います。<br>profile manifest、branch-specific check、cleanup 対象、link conflict、作成予定の symlink を確認しますが、共通 installer は directory 作成、symlink 作成、cleanup を書き込みません。
 
 ```bash
 bash install.sh --dry-run
 bash install.sh --help
 ```
 
-installer の動作確認には、実際の `~/dotfiles` や `$HOME` を変更しない test script を使えます。この script は `/tmp` に一時的な dotfiles checkout と HOME directory を作り、symlink 作成、conflict 検出、stale symlink cleanup、profile check の実行順を検証します。
+installer の動作確認には、実際の `~/dotfiles` や `$HOME` を変更しない test script を使えます。<br>この script は `/tmp` に一時的な dotfiles checkout と HOME directory を作り、symlink 作成、conflict 検出、stale symlink cleanup、profile check の実行順を検証します。
 
 ```bash
 bash scripts/install/test-install.sh
@@ -32,13 +85,11 @@ bash scripts/install/test-install.sh
 bash scripts/install/test-install.sh --verbose
 ```
 
-## `install.sh` の仕組み
+## Installer Flow
 
-`install.sh` は `DOTPATH=~/dotfiles` を起点に、現在 checkout されている branch の内容を実 HOME に symlink します。Conflict をチェックして既存の通常ファイルを上書きせず、Cleanup の際にはこの dotfiles checkout が作った symlink だけを対象にします。
+`install.sh` は `DOTPATH=~/dotfiles` を起点に、現在 checkout されている branch の内容を実 HOME に symlink します。Conflict をチェックして既存の通常ファイルを上書きせず、Cleanup の際にはこの dotfiles checkout が作った symlink だけを対象にします。<br>共通 installer の entrypoint は top-level の `install.sh` に置き、installer の補助実装と regression test は `scripts/install/` にまとめます。一方で、profile branch 固有の surface 定義、check、補助 script は `profiles/<name>/` の下に置き、共通 installer と profile 固有資産を分けます。
 
-共通 installer の entrypoint は top-level の `install.sh` に置き、installer の補助実装と regression test は `scripts/install/` にまとめます。一方で、profile branch 固有の surface 定義、check、補助 script は `profiles/<name>/` の下に置き、共通 installer と profile 固有資産を分けます。
-
-処理は大きく以下の 5 段階です。
+処理は大きく以下の 6 段階です。
 
 1. **Preflight**:
    checkout している branch に対応する profile manifest を読み込み、branch 固有の check 処理を行います。
@@ -50,6 +101,8 @@ bash scripts/install/test-install.sh --verbose
    `.gitconfig`, `.vimrc`, `.zshrc` などの top-level dotfile を symlink します。
 5. **Link Managed Dotfile Surfaces**:
    profile branch が managed surface を定義している場合、ツール用 directory を surface ごとの strategy に従って symlink します。
+6. **Link Shell Themes**:
+   oh-my-zsh の theme directory が存在する場合、repository 直下の `*.zsh-theme` を symlink します。
 
 また、共通 installer は以下の top-level entry を常に symlink 対象から外します。
 
@@ -59,7 +112,7 @@ bash scripts/install/test-install.sh --verbose
 .gitconfig.local
 ```
 
-`.gitconfig.local` は環境ごとの machine-local 設定です。tracked な `.gitconfig` から include しますが、`install.sh` では作成も symlink もしません。profile manifest が managed surface として宣言した top-level root、たとえば `.claude`, `.codex`, `.agents` なども、その profile が有効な間は top-level symlink 対象から外します。
+`.gitconfig.local` は環境ごとの machine-local 設定です。tracked な `.gitconfig` から include しますが、`install.sh` では作成も symlink もしません。<br>profile manifest が managed surface として宣言した top-level root、たとえば `.claude`, `.codex`, `.agents` なども、その profile が有効な間は top-level symlink 対象から外します。
 
 ## Managed Dotfile Surfaces
 
@@ -94,9 +147,7 @@ profiles/<name>/surfaces.tsv
 profiles/<name>/skipsets.tsv
 ```
 
-共通 installer は現在 checkout されている branch と `profile.tsv` の branch pattern を照合し、有効な profile の surface に基づいて、link 先の conflict check、古い symlink の cleanup、symlink 作成を行います。
-
-manifest の kind、必須列、余分な列、surface strategy、skipset 参照は読み込み時に検証します。typo や壊れた行がある場合は、symlink を作る前に file path と line number を出して停止します。
+共通 installer は現在 checkout されている branch と `profile.tsv` の branch pattern を照合し、有効な profile の surface に基づいて、link 先の conflict check、古い symlink の cleanup、symlink 作成を行います。<br>manifest の kind、必須列、余分な列、surface strategy、skipset 参照は読み込み時に検証します。typo や壊れた行がある場合は、symlink を作る前に file path と line number を出して停止します。
 
 ### Profile Manifest Schema
 
@@ -138,39 +189,21 @@ skipset	<name>	<pattern>
 
 ## Branch-Specific Checks
 
-branch 固有の check は、profile branch を安全に適用できる状態かを確認するための仕組みです。次の形式でファイルを追加できます。
+branch 固有の check 処理は、profile branch を安全に適用できる状態かを確認するための仕組みです。次の形式で実行対象の check script を追加できます。
 
 ```text
 profiles/<name>/checks.d/*.sh
 ```
 
-`profile.tsv` で branch pattern に一致した active profile の check だけが、symlink 作成前に実行されます。check は file name の glob 順、つまり通常は辞書順で実行されます。順序を明示したい場合は、`10-local-state.sh`, `20-conflicts.sh` のように番号 prefix を付けます。
+`profile.tsv` で branch pattern に一致した active profile の check だけが、symlink 作成前に実行されます。check は file name の glob 順、つまり通常は辞書順で実行されます。<br>そのため順序を明示したい場合は、`10-local-state.sh`, `20-conflicts.sh` のように番号 prefix を付けます。profile branch に必要な local install state がない場合や、実 HOME 側に危険な競合がある場合は、ここで停止させます。
 
-profile branch に必要な local install state がない場合や、実 HOME 側に危険な競合がある場合は、ここで停止させます。
+たとえば Everything Claude Code (https://github.com/affaan-m/ECC) のような外部 tool を profile の元にする場合、その tool が持つ installer や sync step を dotfiles 側で先に実行してから HOME 側に適用することになります。<br>check script によって tool の install 時に生成される install-state や local marker の存在を確認した上で、profile を HOME に適用することが可能です。
 
-たとえば ECC のように外部 installer や sync step を先に実行してから HOME側に適用する profile では、その install-state や local marker の存在をここで確認します。check script は、現在の環境でこの branch を適用する準備が整っているかを判定するためのもので、確認内容は profile に応じて決定できます。
+check script は選択中の branch の profile を現在の環境に適用する準備が整っているかを判定するためのものなので、check 内容は profile に応じたスクリプトの実装によって定義することができ、上記に限られる必要はありません。
 
-## Branch 戦略
-
-`main` は portable な base branch です。共通 dotfiles、共通 installer、共通 ignore rule を置きます。特定環境で生成された tool output や local install state は含めません。
-
-profile branch は、top-level dotfile だけでは足りない構成を扱うために使います。profile manifest、branch-specific check、手順書、ツールの desired state などを追加できます。
-
-基本形は次のようにします。
-
-```text
-main
-profile/<name>-base
-profile/<name>/<environment>
-```
-
-`*-base` branch は profile の共通構造と手順を置くための branch です。できるだけ portable に保ちます。local path を含む生成物や machine-local な sync marker が必要な場合は、base branch から環境別 branch を切って、その branch で tool installer を実行します。
-
-たとえば ECC profile では、`profile/ecc-base` に installer 連携や手順を置き、実際の Claude / Codex 生成物や local sync marker は `profile/ecc/<environment>` 側で管理します。
-
-## 安全ルール
+## Safety Rules
 
 - `install.sh` は未管理の通常ファイルを上書きしません。
 - cleanup は、この dotfiles checkout を指す symlink だけを削除します。
 - `entries` surface の link 先 directory と `whole` surface の親 directory は、通常 directory である必要があります。未管理 symlink 越しには書き込みません。
-- runtime state、credential、cache、backup、machine-local config は shared commit に含めません。
+- credential、cache、backup、machine-local config といった local / runtime state は shared commit に含めません。
