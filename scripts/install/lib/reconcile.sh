@@ -2,7 +2,7 @@
 
 # Reconciliation engine: validate destination conflicts, identify symlinks owned
 # by this dotfiles checkout, prune stale managed links, and create the desired
-# top-level and managed-surface symlinks.
+# top-level, managed-surface, and shell-theme symlinks.
 
 remove_managed_path() {
     local description="$1"
@@ -290,6 +290,18 @@ preflight_all_managed_surfaces() {
     done
 }
 
+preflight_shell_themes() {
+    local theme theme_dest
+
+    [ -d "$OH_MY_ZSH_THEMES" ] || return 0
+
+    for theme in "$DOTPATH"/*.zsh-theme; do
+        [ -e "$theme" ] || [ -L "$theme" ] || continue
+        theme_dest="$OH_MY_ZSH_THEMES/$(basename "$theme")"
+        check_managed_entry "$theme_dest" "$DOTPATH" || return 1
+    done
+}
+
 link_all_managed_surfaces() {
     local surface strategy source_path dest_path skipset label
 
@@ -304,5 +316,22 @@ link_all_managed_surfaces() {
             entries) link_managed_entries "$source_path" "$dest_path" "$skipset" || return 1 ;;
             whole) link_whole_surface "$source_path" "$dest_path" || return 1 ;;
         esac
+    done
+}
+
+link_shell_themes() {
+    local theme theme_dest
+
+    if [ ! -d "$OH_MY_ZSH_THEMES" ]; then
+        log_step "Skip: $OH_MY_ZSH_THEMES does not exist"
+        return 0
+    fi
+
+    log_step "Source: $DOTPATH"
+    log_step "Target: $OH_MY_ZSH_THEMES"
+    for theme in "$DOTPATH"/*.zsh-theme; do
+        [ -e "$theme" ] || [ -L "$theme" ] || continue
+        theme_dest="$OH_MY_ZSH_THEMES/$(basename "$theme")"
+        link_managed_entry "$theme" "$theme_dest" "$DOTPATH" || return 1
     done
 }

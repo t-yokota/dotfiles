@@ -81,6 +81,8 @@ log_step "Check top-level destination conflicts"
 preflight_root_entries || exit 1
 log_step "Check managed dotfile surface destination conflicts"
 preflight_all_managed_surfaces || exit 1
+log_step "Check shell theme destination conflicts"
+preflight_shell_themes || exit 1
 
 log_section "Link Top-Level Dotfiles"
 log_step "Source: $DOTPATH"
@@ -95,21 +97,7 @@ log_section "Link Managed Dotfile Surfaces"
 link_all_managed_surfaces || exit 1
 
 log_section "Link Shell Themes"
-if [ -d "$OH_MY_ZSH_THEMES" ]; then
-    log_step "Source: $DOTPATH"
-    log_step "Target: $OH_MY_ZSH_THEMES"
-    for theme in "$DOTPATH"/*.zsh-theme; do
-        theme_dest="$OH_MY_ZSH_THEMES/$(basename "$theme")"
-        if is_dry_run; then
-            log_would_link "$theme_dest" "$theme"
-        else
-            ln -snf "$theme" "$theme_dest" || exit 1
-            log_link "$theme_dest" "$theme"
-        fi
-    done
-else
-    log_step "Skip: $OH_MY_ZSH_THEMES does not exist"
-fi
+link_shell_themes || exit 1
 
 if is_dry_run; then
     log_section "Dry-run Result"

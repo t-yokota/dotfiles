@@ -224,6 +224,40 @@ test_whole_surfaces_and_child_entries() {
     assert_symlink_target "$home/.claude/mcp-configs" "$fixture/.claude/mcp-configs" || return 1
 }
 
+test_shell_theme_links() {
+    local fixture="$TEST_ROOT/theme-fixture"
+    local home="$TEST_ROOT/theme-home"
+    local output="$TEST_ROOT/theme-output.log"
+
+    make_fixture "$fixture" || return 1
+    mkdir -p "$home/.oh-my-zsh/themes" || return 1
+    write_file "$fixture/my.zsh-theme" "theme" || return 1
+
+    run_install "$fixture" "$home" "profile/ecc-base" "$output" || return 1
+
+    assert_symlink_target "$home/.oh-my-zsh/themes/my.zsh-theme" "$fixture/my.zsh-theme" || return 1
+}
+
+test_shell_theme_conflict_fails() {
+    local fixture="$TEST_ROOT/theme-conflict-fixture"
+    local home="$TEST_ROOT/theme-conflict-home"
+    local output="$TEST_ROOT/theme-conflict-output.log"
+
+    make_fixture "$fixture" || return 1
+    mkdir -p "$home/.oh-my-zsh/themes" || return 1
+    write_file "$fixture/.zshrc" "zsh" || return 1
+    write_file "$fixture/my.zsh-theme" "managed theme" || return 1
+    write_file "$home/.oh-my-zsh/themes/my.zsh-theme" "local theme" || return 1
+
+    if run_install "$fixture" "$home" "profile/ecc-base" "$output"; then
+        log "Install unexpectedly succeeded despite shell theme conflict"
+        return 1
+    fi
+
+    assert_file_contains "$output" "already exists and is not a dotfiles-managed symlink" || return 1
+    assert_absent "$home/.zshrc" || return 1
+}
+
 test_check_ordering() {
     local fixture="$TEST_ROOT/check-fixture"
     local home="$TEST_ROOT/check-home"
@@ -378,6 +412,21 @@ test_short_dry_run_option_does_not_write() {
     assert_absent "$home/.zshrc" || return 1
 }
 
+test_shell_theme_dry_run_does_not_write() {
+    local fixture="$TEST_ROOT/theme-dry-run-fixture"
+    local home="$TEST_ROOT/theme-dry-run-home"
+    local output="$TEST_ROOT/theme-dry-run-output.log"
+
+    make_fixture "$fixture" || return 1
+    mkdir -p "$home/.oh-my-zsh/themes" || return 1
+    write_file "$fixture/my.zsh-theme" "theme" || return 1
+
+    run_install_args "$fixture" "$home" "profile/ecc-base" "$output" --dry-run || return 1
+
+    assert_file_contains "$output" "Would link" || return 1
+    assert_absent "$home/.oh-my-zsh/themes/my.zsh-theme" || return 1
+}
+
 run_test() {
     local name="$1"
     local fn="$2"
@@ -392,6 +441,8 @@ run_test() {
 log "Workspace: $TEST_ROOT"
 run_test "base profile entry links" test_base_profile_entry_links
 run_test "whole surfaces and child entries" test_whole_surfaces_and_child_entries
+run_test "shell theme links" test_shell_theme_links
+run_test "shell theme conflict fails" test_shell_theme_conflict_fails
 run_test "check ordering by file name" test_check_ordering
 run_test "unmanaged entry conflict" test_unmanaged_entry_conflict
 run_test "stale managed symlink cleanup" test_stale_managed_symlink_cleanup
@@ -400,6 +451,7 @@ run_test "help does not install" test_help_does_not_install
 run_test "unknown option fails" test_unknown_option_fails
 run_test "dry-run does not write" test_dry_run_does_not_write
 run_test "short dry-run option does not write" test_short_dry_run_option_does_not_write
+run_test "shell theme dry-run does not write" test_shell_theme_dry_run_does_not_write
 
 log "Passed: $PASS_COUNT"
 log "Failed: $FAIL_COUNT"
