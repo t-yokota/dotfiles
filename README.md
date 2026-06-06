@@ -98,6 +98,44 @@ profiles/<name>/skipsets.tsv
 
 manifest の kind、必須列、余分な列、surface strategy、skipset 参照は読み込み時に検証します。typo や壊れた行がある場合は、symlink を作る前に file path と line number を出して停止します。
 
+### Profile Manifest Schema
+
+manifest は tab 区切りの TSV です。空行と `#` で始まる行は無視されます。余分な列がある行は invalid として扱います。
+
+`profile.tsv` は、profile が有効になる branch pattern と、関連 manifest の場所を定義します。
+
+```text
+branch	<branch-pattern>
+surfaces	<profile-relative-path>
+skipsets	<profile-relative-path>
+checks	<profile-relative-path>
+```
+
+- `branch`: 現在の branch に対する glob pattern です。例: `profile/ecc-base`, `profile/ecc/*`
+- `surfaces`: surface 定義 file です。省略時は `surfaces.tsv` です。
+- `skipsets`: skipset 定義 file です。省略時は `skipsets.tsv` です。
+- `checks`: branch-specific check directory です。省略時は `checks.d` です。
+
+`surfaces.tsv` は、dotfiles 側の desired state を HOME 側にどの粒度で出すかを定義します。
+
+```text
+surface	entries|whole	<source>	<dest>	<skipset-name|none>	<label>
+```
+
+- `entries`: `<source>` directory の entry を `<dest>` directory 内へ個別に symlink します。
+- `whole`: `<source>` の file / directory 自体を `<dest>` へ symlink します。
+- `<source>` は dotfiles checkout からの path、`<dest>` は HOME からの path として解決します。
+- `<skipset-name>` は `skipsets.tsv` に定義された名前、または skip しない場合の `none` です。
+- `<label>` は install log に出す説明です。space は使えますが、tab は列区切りとして扱います。
+
+`skipsets.tsv` は、`entries` surface で link 対象から外す entry 名 pattern を定義します。
+
+```text
+skipset	<name>	<pattern>
+```
+
+`<name>` は `surfaces.tsv` から参照する skipset 名です。`<pattern>` は directory 内の entry 名に対する shell glob pattern です。例: `sessions`, `*.log`, `dotfiles-*-sync-state.json`
+
 ## Branch-Specific Checks
 
 branch 固有の check は、profile branch を安全に適用できる状態かを確認するための仕組みです。次の形式でファイルを追加できます。

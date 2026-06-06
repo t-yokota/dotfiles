@@ -100,27 +100,27 @@ validate_skipsets_line() {
     local file="$1"
     local line_number="$2"
     local line="$3"
-    local kind skipset pattern extra
+    local kind name pattern extra
 
-    IFS=$'\t' read -r kind skipset pattern extra <<< "$line"
+    IFS=$'\t' read -r kind name pattern extra <<< "$line"
 
-    if [ "$kind" != "skip" ]; then
+    if [ "$kind" != "skipset" ]; then
         manifest_error "$file" "$line_number" "unknown skipsets kind: ${kind:-<empty>}"
         return 1
     fi
 
-    if [ -z "$skipset" ]; then
-        manifest_error "$file" "$line_number" "skip row requires a skipset"
+    if [ -z "$name" ]; then
+        manifest_error "$file" "$line_number" "skipset row requires a name"
         return 1
     fi
 
     if [ -z "$pattern" ]; then
-        manifest_error "$file" "$line_number" "skip row requires a pattern"
+        manifest_error "$file" "$line_number" "skipset row requires a pattern"
         return 1
     fi
 
     if [ -n "$extra" ]; then
-        manifest_error "$file" "$line_number" "skip row has too many columns"
+        manifest_error "$file" "$line_number" "skipset row has too many columns"
         return 1
     fi
 }
@@ -289,7 +289,7 @@ profile_matches_branch() {
 
 load_skipsets_file() {
     local file="$1"
-    local line line_number kind skipset pattern rest
+    local line line_number kind name pattern rest
 
     [ -f "$file" ] || return 0
     log_substep "$file"
@@ -299,8 +299,8 @@ load_skipsets_file() {
         line_number=$((line_number + 1))
         line_is_ignored "$line" && continue
         validate_skipsets_line "$file" "$line_number" "$line" || return 1
-        IFS=$'\t' read -r kind skipset pattern rest <<< "$line"
-        add_skip_pattern "$skipset" "$pattern"
+        IFS=$'\t' read -r kind name pattern rest <<< "$line"
+        add_skip_pattern "$name" "$pattern"
     done < "$file"
 }
 

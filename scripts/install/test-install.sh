@@ -239,7 +239,7 @@ test_check_ordering() {
 checks	checks.d
 skipsets	skipsets.tsv
 surfaces	surfaces.tsv" || return 1
-    write_file "$fixture/profiles/order/skipsets.tsv" "# kind	skipset	pattern" || return 1
+    write_file "$fixture/profiles/order/skipsets.tsv" "# kind	name	pattern" || return 1
     write_file "$fixture/profiles/order/surfaces.tsv" "# kind	strategy	source	dest	skipset	label" || return 1
     write_file "$fixture/profiles/order/checks.d/20-second.sh" \
 "#!/usr/bin/env bash
