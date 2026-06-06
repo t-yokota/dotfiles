@@ -11,7 +11,7 @@ SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 REPO_ROOT=$(cd "$SCRIPT_DIR/../.." && pwd)
 TEST_ROOT=$(mktemp -d "${TMPDIR:-/tmp}/dotfiles-install-test.XXXXXX")
 
-TEST_BRANCH=test/base
+TEST_BRANCH=profile/test-base
 VERBOSE=0
 PASS_COUNT=0
 FAIL_COUNT=0
@@ -80,15 +80,17 @@ copy_installer_files() {
     cp "$REPO_ROOT/install.sh" "$fixture/install.sh" || return 1
     mkdir -p "$fixture/scripts/install" || return 1
     cp -R "$REPO_ROOT/scripts/install/lib" "$fixture/scripts/install/lib" || return 1
+    cp "$REPO_ROOT/scripts/install/test-profile.sh" "$fixture/scripts/install/test-profile.sh" || return 1
 }
 
 write_test_profile() {
     local fixture="$1"
     local profile_dir="$fixture/profiles/test"
 
-    mkdir -p "$profile_dir" || return 1
+    mkdir -p "$profile_dir/checks.d" || return 1
     write_file "$profile_dir/profile.tsv" \
 "branch	$TEST_BRANCH
+branch	profile/test/*
 skipsets	skipsets.tsv
 surfaces	surfaces.tsv
 checks	checks.d" || return 1
@@ -320,6 +322,30 @@ printf '10\n' >> \"\$HOME/check-order.log\"" || return 1
 20" || return 1
 }
 
+test_profile_smoke_runner() {
+    local fixture="$TEST_ROOT/profile-runner-fixture"
+    local output="$TEST_ROOT/profile-runner-output.log"
+
+    make_fixture "$fixture" || return 1
+    write_file "$fixture/.tool/config.toml" "config" || return 1
+    write_file "$fixture/.tool/items/example.txt" "item" || return 1
+    write_file "$fixture/.tool/package/manifest.json" "{}" || return 1
+
+    if ! bash "$fixture/scripts/install/test-profile.sh" \
+        --profile profiles/test \
+        --branch "$TEST_BRANCH" > "$output" 2>&1
+    then
+        [ "$VERBOSE" -eq 1 ] && show_output "profile smoke runner log" "$output"
+        return 1
+    fi
+
+    if [ "$VERBOSE" -eq 1 ]; then
+        show_output "profile smoke runner log" "$output"
+    fi
+
+    assert_file_contains "$output" "PASS: profile installs into an isolated HOME fixture" || return 1
+}
+
 test_unmanaged_entry_conflict() {
     local fixture="$TEST_ROOT/conflict-fixture"
     local home="$TEST_ROOT/conflict-home"
@@ -472,6 +498,7 @@ run_test "whole surfaces and child entries" test_whole_surfaces_and_child_entrie
 run_test "shell theme links" test_shell_theme_links
 run_test "shell theme conflict fails" test_shell_theme_conflict_fails
 run_test "check ordering by file name" test_check_ordering
+run_test "profile smoke runner" test_profile_smoke_runner
 run_test "unmanaged entry conflict" test_unmanaged_entry_conflict
 run_test "stale managed symlink cleanup" test_stale_managed_symlink_cleanup
 run_test "invalid manifest fails" test_invalid_manifest_fails
