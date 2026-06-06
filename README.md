@@ -29,6 +29,8 @@ bash scripts/install/test-install.sh --verbose
 
 `install.sh` は `DOTPATH=~/dotfiles` を起点に、現在 checkout されている branch の内容を実 HOME に symlink します。Conflict をチェックして既存の通常ファイルを上書きせず、Cleanup の際にはこの dotfiles checkout が作った symlink だけを対象にします。
 
+共通 installer の entrypoint は top-level の `install.sh` に置き、installer の補助実装と regression test は `scripts/install/` にまとめます。一方で、profile branch 固有の surface 定義、check、補助 script は `profiles/<name>/` の下に置き、共通 installer と profile 固有資産を分けます。
+
 処理は大きく以下の 5 段階です。
 
 1. **Preflight**:

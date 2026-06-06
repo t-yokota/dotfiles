@@ -78,6 +78,8 @@ make_fixture() {
 
     mkdir -p "$fixture/profiles" || return 1
     cp "$REPO_ROOT/install.sh" "$fixture/install.sh" || return 1
+    mkdir -p "$fixture/scripts/install" || return 1
+    cp -R "$REPO_ROOT/scripts/install/lib" "$fixture/scripts/install/lib" || return 1
     cp -R "$REPO_ROOT/profiles/ecc" "$fixture/profiles/ecc" || return 1
 }
 
@@ -219,6 +221,8 @@ test_check_ordering() {
 
     mkdir -p "$fixture/profiles/order/checks.d" "$home" || return 1
     cp "$REPO_ROOT/install.sh" "$fixture/install.sh" || return 1
+    mkdir -p "$fixture/scripts/install" || return 1
+    cp -R "$REPO_ROOT/scripts/install/lib" "$fixture/scripts/install/lib" || return 1
 
     write_file "$fixture/profiles/order/profile.tsv" \
 "branch	test/check-order
