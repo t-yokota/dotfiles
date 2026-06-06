@@ -20,6 +20,8 @@ profile/<name>/<environment>
 
 `*-base` branch は profile の共通構造と手順を置くための branch です。できるだけ portable に保ちます。local path を含む生成物や machine-local な sync marker が必要な場合は、base branch から環境別 branch を切って、その branch で tool installer を実行します。<br>たとえば ECC profile では、`profile/ecc-base` に installer 連携や手順を置き、実際の Claude / Codex 生成物や local sync marker は `profile/ecc/<environment>` 側で管理します。
 
+既存 profile を元に別 profile を作る場合は、`profiles/<name>/` を profile の資産として一式コピーします。`profile.tsv`, `surfaces.tsv`, `skipsets.tsv`, `checks.d/` だけでなく、`bin/` に置いた profile-local な補助 script や smoke test も移植対象です。移植後は `profile.tsv` の branch pattern を新しい profile 名に合わせ、`bash profiles/<name>/bin/test-profile.sh --branch profile/<name>-base` で profile が単独で適用可能か確認します。
+
 ## Repository Layout
 
 この repository は、portable な top-level dotfiles、共通 installer、profile branch 固有の manifest / check / 補助 script を分けて管理します。
@@ -53,7 +55,7 @@ profile/<name>/<environment>
 - `scripts/install/lib/profile.sh`: profile manifest loader です。現在の branch に合う profile を選び、`profile.tsv`, `surfaces.tsv`, `skipsets.tsv` を検証して installer state に読み込み、profile 固有 check を実行します。
 - `scripts/install/lib/reconcile.sh`: desired state と HOME の actual state を突き合わせる engine です。未管理 path の conflict check、dotfiles 管理 symlink の cleanup、top-level dotfile / managed surface / shell theme の symlink 作成を担当します。
 - `scripts/install/test-install.sh`: installer の regression test です。`/tmp` に一時的な dotfiles checkout と HOME を作り、実 HOME を触らずに install / dry-run / conflict / cleanup / manifest validation を確認します。
-- `profiles/<name>/`: profile branch 固有の定義です。surface、skipset、branch-specific check、profile 補助 script をここに置きます。
+- `profiles/<name>/`: profile branch 固有の定義です。surface、skipset、branch-specific check、profile 補助 script、profile-local smoke test をここに置きます。
 - `.claude/`, `.codex/`, `.agents/`: profile が HOME に出す tool 用 desired state です。root directory ごと symlink するのではなく、profile manifest の surface 定義に従って扱います。
 - `docs/`: profile の背景、手順、外部 tool との対応関係など、README に収めない長めの補足を置きます。
 
@@ -79,10 +81,16 @@ installer の動作確認には、実際の `~/dotfiles` や `$HOME` を変更�
 bash scripts/install/test-install.sh
 ```
 
-各 fixture で実行した `install.sh` の詳細ログを確認したい場合は、`--verbose` を付けます。
+`test-install.sh` の詳細ログを確認したい場合は、`--verbose` を付けます。内部で実行した `install.sh` の出力も表示されます。
 
 ```bash
 bash scripts/install/test-install.sh --verbose
+```
+
+profile branch 側に `profiles/<name>/bin/test-profile.sh` がある場合は、その profile 自体が一時 HOME に適用できるかを確認できます。たとえば ECC profile では次のように実行します。
+
+```bash
+bash profiles/ecc/bin/test-profile.sh
 ```
 
 ## Installer Flow
