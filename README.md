@@ -35,7 +35,8 @@ profile/<name>/<environment>
 │       │   ├── common.sh
 │       │   ├── profile.sh
 │       │   └── reconcile.sh
-│       └── test-install.sh
+│       ├── test-install.sh
+│       └── test-profile.sh
 ├── profiles/
 │   └── <name>/
 │       ├── profile.tsv
@@ -55,7 +56,8 @@ profile/<name>/<environment>
 - `scripts/install/lib/profile.sh`: profile manifest loader です。現在の branch に合う profile を選び、`profile.tsv`, `surfaces.tsv`, `skipsets.tsv` を検証して installer state に読み込み、profile 固有 check を実行します。
 - `scripts/install/lib/reconcile.sh`: desired state と HOME の actual state を突き合わせる engine です。未管理 path の conflict check、dotfiles 管理 symlink の cleanup、top-level dotfile / managed surface / shell theme の symlink 作成を担当します。
 - `scripts/install/test-install.sh`: installer の regression test です。`/tmp` に一時的な dotfiles checkout と HOME を作り、実 HOME を触らずに install / dry-run / conflict / cleanup / manifest validation を確認します。
-- `profiles/<name>/`: profile branch 固有の定義です。surface、skipset、branch-specific check、profile 補助 script、profile-local smoke test をここに置きます。
+- `scripts/install/test-profile.sh`: profile smoke test の共通 runner です。指定した `profiles/<name>/` を一時 HOME に適用し、profile manifest と surface の基本動作を確認します。
+- `profiles/<name>/`: profile branch 固有の定義です。surface、skipset、branch-specific check、profile 補助 script、profile-local smoke test wrapper をここに置きます。
 - `.claude/`, `.codex/`, `.agents/`: profile が HOME に出す tool 用 desired state です。root directory ごと symlink するのではなく、profile manifest の surface 定義に従って扱います。
 - `docs/`: profile の背景、手順、外部 tool との対応関係など、README に収めない長めの補足を置きます。
 
