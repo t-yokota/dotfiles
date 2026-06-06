@@ -278,6 +278,26 @@ test_stale_managed_symlink_cleanup() {
     assert_symlink_target "$home/.claude/agents/current.md" "$fixture/.claude/agents/current.md" || return 1
 }
 
+test_invalid_manifest_fails() {
+    local fixture="$TEST_ROOT/invalid-manifest-fixture"
+    local home="$TEST_ROOT/invalid-manifest-home"
+    local output="$TEST_ROOT/invalid-manifest-output.log"
+
+    make_fixture "$fixture" || return 1
+    mkdir -p "$home" || return 1
+    write_file "$fixture/profiles/ecc/surfaces.tsv" \
+"# kind	strategy	source	dest	skipset	label
+surface	entries	.claude	.claude	missing-skipset	Broken surface" || return 1
+
+    if run_install "$fixture" "$home" "profile/ecc-base" "$output"; then
+        log "Install unexpectedly succeeded despite invalid manifest"
+        return 1
+    fi
+
+    assert_file_contains "$output" "invalid installer manifest" || return 1
+    assert_file_contains "$output" "references unknown skipset: missing-skipset" || return 1
+}
+
 run_test() {
     local name="$1"
     local fn="$2"
@@ -295,6 +315,7 @@ run_test "whole surfaces and child entries" test_whole_surfaces_and_child_entrie
 run_test "check ordering by file name" test_check_ordering
 run_test "unmanaged entry conflict" test_unmanaged_entry_conflict
 run_test "stale managed symlink cleanup" test_stale_managed_symlink_cleanup
+run_test "invalid manifest fails" test_invalid_manifest_fails
 
 log "Passed: $PASS_COUNT"
 log "Failed: $FAIL_COUNT"

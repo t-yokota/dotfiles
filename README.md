@@ -89,6 +89,8 @@ profiles/<name>/skipsets.tsv
 
 共通 installer は現在 checkout されている branch と `profile.tsv` の branch pattern を照合し、有効な profile の surface に基づいて、link 先の conflict check、古い symlink の cleanup、symlink 作成を行います。
 
+manifest の kind、必須列、余分な列、surface strategy、skipset 参照は読み込み時に検証します。typo や壊れた行がある場合は、symlink を作る前に file path と line number を出して停止します。
+
 ## Branch-Specific Checks
 
 branch 固有の check は、profile branch を安全に適用できる状態かを確認するための仕組みです。次の形式でファイルを追加できます。

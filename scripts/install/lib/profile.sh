@@ -40,12 +40,179 @@ should_skip_root_entry() {
     is_reserved_root_entry "$1"
 }
 
+manifest_error() {
+    local file="$1"
+    local line_number="$2"
+    local message="$3"
+
+    echo "Error: invalid installer manifest: $file:$line_number: $message" >&2
+    return 1
+}
+
+validate_profile_manifest_path() {
+    local file="$1"
+    local line_number="$2"
+    local field_name="$3"
+    local path="$4"
+
+    case "$path" in
+        /*|..|../*|*/../*|*/..)
+            manifest_error "$file" "$line_number" "$field_name must be a relative path inside the profile directory"
+            return 1
+            ;;
+    esac
+}
+
+validate_profile_manifest_line() {
+    local file="$1"
+    local line_number="$2"
+    local line="$3"
+    local kind value extra
+
+    IFS=$'\t' read -r kind value extra <<< "$line"
+
+    case "$kind" in
+        branch|surfaces|skipsets|checks) ;;
+        *)
+            manifest_error "$file" "$line_number" "unknown profile kind: ${kind:-<empty>}"
+            return 1
+            ;;
+    esac
+
+    if [ -z "$value" ]; then
+        manifest_error "$file" "$line_number" "$kind row requires a value"
+        return 1
+    fi
+
+    if [ -n "$extra" ]; then
+        manifest_error "$file" "$line_number" "$kind row has too many columns"
+        return 1
+    fi
+
+    case "$kind" in
+        surfaces|skipsets|checks)
+            validate_profile_manifest_path "$file" "$line_number" "$kind" "$value" || return 1
+            ;;
+    esac
+}
+
+validate_skipsets_line() {
+    local file="$1"
+    local line_number="$2"
+    local line="$3"
+    local kind skipset pattern extra
+
+    IFS=$'\t' read -r kind skipset pattern extra <<< "$line"
+
+    if [ "$kind" != "skip" ]; then
+        manifest_error "$file" "$line_number" "unknown skipsets kind: ${kind:-<empty>}"
+        return 1
+    fi
+
+    if [ -z "$skipset" ]; then
+        manifest_error "$file" "$line_number" "skip row requires a skipset"
+        return 1
+    fi
+
+    if [ -z "$pattern" ]; then
+        manifest_error "$file" "$line_number" "skip row requires a pattern"
+        return 1
+    fi
+
+    if [ -n "$extra" ]; then
+        manifest_error "$file" "$line_number" "skip row has too many columns"
+        return 1
+    fi
+}
+
+validate_surfaces_line() {
+    local file="$1"
+    local line_number="$2"
+    local line="$3"
+    local kind strategy source_rel dest_rel skipset label extra
+
+    IFS=$'\t' read -r kind strategy source_rel dest_rel skipset label extra <<< "$line"
+
+    if [ "$kind" != "surface" ]; then
+        manifest_error "$file" "$line_number" "unknown surfaces kind: ${kind:-<empty>}"
+        return 1
+    fi
+
+    if [ -z "$strategy" ]; then
+        manifest_error "$file" "$line_number" "surface row requires a strategy"
+        return 1
+    fi
+
+    case "$strategy" in
+        entries|whole) ;;
+        *)
+            manifest_error "$file" "$line_number" "unknown surface strategy: $strategy"
+            return 1
+            ;;
+    esac
+
+    if [ -z "$source_rel" ]; then
+        manifest_error "$file" "$line_number" "surface row requires a source"
+        return 1
+    fi
+
+    if [ -z "$dest_rel" ]; then
+        manifest_error "$file" "$line_number" "surface row requires a dest"
+        return 1
+    fi
+
+    if [ -z "$skipset" ]; then
+        manifest_error "$file" "$line_number" "surface row requires a skipset"
+        return 1
+    fi
+
+    if [ "$skipset" != "none" ] && ! is_known_skipset "$skipset"; then
+        manifest_error "$file" "$line_number" "surface row references unknown skipset: $skipset"
+        return 1
+    fi
+
+    if [ -z "$label" ]; then
+        manifest_error "$file" "$line_number" "surface row requires a label"
+        return 1
+    fi
+
+    if [ -n "$extra" ]; then
+        manifest_error "$file" "$line_number" "surface row has too many columns"
+        return 1
+    fi
+}
+
+add_known_skipset() {
+    local skipset="$1"
+    local entry
+
+    [ -n "$skipset" ] || return 0
+
+    for entry in "${KNOWN_SKIPSETS[@]}"; do
+        [ "$entry" = "$skipset" ] && return 0
+    done
+
+    KNOWN_SKIPSETS+=("$skipset")
+}
+
+is_known_skipset() {
+    local skipset="$1"
+    local entry
+
+    for entry in "${KNOWN_SKIPSETS[@]}"; do
+        [ "$entry" = "$skipset" ] && return 0
+    done
+
+    return 1
+}
+
 add_skip_pattern() {
     local skipset="$1"
     local pattern="$2"
 
     [ -n "$skipset" ] || return 0
     [ -n "$pattern" ] || return 0
+    add_known_skipset "$skipset"
     SKIPSET_PATTERNS+=("$skipset"$'\t'"$pattern")
 }
 
@@ -101,12 +268,15 @@ is_surface_source() {
 profile_matches_branch() {
     local manifest="$1"
     local branch="$2"
-    local line kind pattern rest
+    local line line_number kind pattern rest
 
     [ -n "$branch" ] || return 1
 
+    line_number=0
     while IFS= read -r line; do
+        line_number=$((line_number + 1))
         line_is_ignored "$line" && continue
+        validate_profile_manifest_line "$manifest" "$line_number" "$line" || return 2
         IFS=$'\t' read -r kind pattern rest <<< "$line"
         [ "$kind" = "branch" ] || continue
         if [[ "$branch" == $pattern ]]; then
@@ -119,31 +289,35 @@ profile_matches_branch() {
 
 load_skipsets_file() {
     local file="$1"
-    local line kind skipset pattern rest
+    local line line_number kind skipset pattern rest
 
     [ -f "$file" ] || return 0
     log_substep "$file"
 
+    line_number=0
     while IFS= read -r line; do
+        line_number=$((line_number + 1))
         line_is_ignored "$line" && continue
+        validate_skipsets_line "$file" "$line_number" "$line" || return 1
         IFS=$'\t' read -r kind skipset pattern rest <<< "$line"
-        [ "$kind" = "skip" ] || continue
         add_skip_pattern "$skipset" "$pattern"
     done < "$file"
 }
 
 load_surfaces_file() {
     local file="$1"
-    local line kind strategy source_rel dest_rel skipset label
+    local line line_number kind strategy source_rel dest_rel skipset label
     local source_path dest_path root_entry
 
     [ -f "$file" ] || return 0
     log_substep "$file"
 
+    line_number=0
     while IFS= read -r line; do
+        line_number=$((line_number + 1))
         line_is_ignored "$line" && continue
+        validate_surfaces_line "$file" "$line_number" "$line" || return 1
         IFS=$'\t' read -r kind strategy source_rel dest_rel skipset label <<< "$line"
-        [ "$kind" = "surface" ] || continue
 
         source_path=$(resolve_dotpath_path "$source_rel")
         dest_path=$(resolve_home_path "$dest_rel")
@@ -159,13 +333,16 @@ load_surfaces_file() {
 load_profile_manifest() {
     local manifest="$1"
     local profile_dir="${manifest%/*}"
-    local line kind value rest
+    local line line_number kind value rest
     local surfaces_file="surfaces.tsv"
     local skipsets_file="skipsets.tsv"
     local checks_dir="checks.d"
 
+    line_number=0
     while IFS= read -r line; do
+        line_number=$((line_number + 1))
         line_is_ignored "$line" && continue
+        validate_profile_manifest_line "$manifest" "$line_number" "$line" || return 1
         IFS=$'\t' read -r kind value rest <<< "$line"
         case "$kind" in
             surfaces) surfaces_file="$value" ;;
@@ -182,16 +359,26 @@ load_profile_manifest() {
 load_active_profile_manifests() {
     local branch
     local manifest
+    local match_rc
 
     branch=$(get_current_branch)
     [ -n "$branch" ] || return 0
 
     for manifest in "$DOTPATH"/profiles/*/profile.tsv; do
         [ -f "$manifest" ] || continue
-        if profile_matches_branch "$manifest" "$branch"; then
-            log_substep "Profile: ${manifest%/*}"
-            load_profile_manifest "$manifest" || return 1
-        fi
+        profile_matches_branch "$manifest" "$branch"
+        match_rc=$?
+        case "$match_rc" in
+            0)
+                log_substep "Profile: ${manifest%/*}"
+                load_profile_manifest "$manifest" || return 1
+                ;;
+            1)
+                ;;
+            *)
+                return 1
+                ;;
+        esac
     done
 }
 
