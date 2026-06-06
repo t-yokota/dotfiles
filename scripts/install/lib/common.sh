@@ -19,6 +19,14 @@ log_link() {
     printf '    - Link: %s -> %s\n' "$1" "$2"
 }
 
+log_would_link() {
+    printf '    - Would link: %s -> %s\n' "$1" "$2"
+}
+
+is_dry_run() {
+    [ "${INSTALL_DRY_RUN:-0}" = "1" ]
+}
+
 line_is_ignored() {
     local line="$1"
 

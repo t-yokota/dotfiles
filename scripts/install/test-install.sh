@@ -88,13 +88,23 @@ run_install() {
     local home="$2"
     local branch="$3"
     local output="$4"
+
+    run_install_args "$fixture" "$home" "$branch" "$output"
+}
+
+run_install_args() {
+    local fixture="$1"
+    local home="$2"
+    local branch="$3"
+    local output="$4"
     local rc
+    shift 4
 
     HOME="$home" \
     DOTPATH="$fixture" \
     DOTFILES_BRANCH="$branch" \
     OH_MY_ZSH_THEMES="$home/.oh-my-zsh/themes" \
-        bash "$fixture/install.sh" > "$output" 2>&1
+        bash "$fixture/install.sh" "$@" > "$output" 2>&1
     rc=$?
 
     if [ "$VERBOSE" -eq 1 ]; then
@@ -298,6 +308,76 @@ surface	entries	.claude	.claude	missing-skipset	Broken surface" || return 1
     assert_file_contains "$output" "references unknown skipset: missing-skipset" || return 1
 }
 
+test_help_does_not_install() {
+    local fixture="$TEST_ROOT/help-fixture"
+    local home="$TEST_ROOT/help-home"
+    local output="$TEST_ROOT/help-output.log"
+
+    make_fixture "$fixture" || return 1
+    mkdir -p "$home" || return 1
+    write_file "$fixture/.zshrc" "zsh" || return 1
+
+    run_install_args "$fixture" "$home" "profile/ecc-base" "$output" --help || return 1
+
+    assert_file_contains "$output" "Usage: bash install.sh" || return 1
+    assert_absent "$home/.zshrc" || return 1
+}
+
+test_unknown_option_fails() {
+    local fixture="$TEST_ROOT/unknown-option-fixture"
+    local home="$TEST_ROOT/unknown-option-home"
+    local output="$TEST_ROOT/unknown-option-output.log"
+
+    make_fixture "$fixture" || return 1
+    mkdir -p "$home" || return 1
+    write_file "$fixture/.zshrc" "zsh" || return 1
+
+    if run_install_args "$fixture" "$home" "profile/ecc-base" "$output" --unknown; then
+        log "Install unexpectedly succeeded despite unsupported option"
+        return 1
+    fi
+
+    assert_file_contains "$output" "unknown option: --unknown" || return 1
+    assert_absent "$home/.zshrc" || return 1
+}
+
+test_dry_run_does_not_write() {
+    local fixture="$TEST_ROOT/dry-run-fixture"
+    local home="$TEST_ROOT/dry-run-home"
+    local output="$TEST_ROOT/dry-run-output.log"
+
+    make_fixture "$fixture" || return 1
+    mkdir -p "$home/.claude/agents" "$fixture/.claude/agents" || return 1
+    write_file "$fixture/.zshrc" "zsh" || return 1
+    write_file "$fixture/.claude/agents/current.md" "current" || return 1
+    ln -s "$fixture/.claude/agents/removed.md" "$home/.claude/agents/removed.md" || return 1
+
+    run_install_args "$fixture" "$home" "profile/ecc-base" "$output" --dry-run || return 1
+
+    assert_file_contains "$output" "Dry-run mode" || return 1
+    assert_file_contains "$output" "Would link" || return 1
+    assert_file_contains "$output" "Would remove stale or skipped symlink" || return 1
+    assert_file_contains "$output" "no changes were written" || return 1
+    assert_absent "$home/.zshrc" || return 1
+    assert_absent "$home/.claude/agents/current.md" || return 1
+    assert_symlink_target "$home/.claude/agents/removed.md" "$fixture/.claude/agents/removed.md" || return 1
+}
+
+test_short_dry_run_option_does_not_write() {
+    local fixture="$TEST_ROOT/short-dry-run-fixture"
+    local home="$TEST_ROOT/short-dry-run-home"
+    local output="$TEST_ROOT/short-dry-run-output.log"
+
+    make_fixture "$fixture" || return 1
+    mkdir -p "$home" || return 1
+    write_file "$fixture/.zshrc" "zsh" || return 1
+
+    run_install_args "$fixture" "$home" "profile/ecc-base" "$output" -n || return 1
+
+    assert_file_contains "$output" "Dry-run mode" || return 1
+    assert_absent "$home/.zshrc" || return 1
+}
+
 run_test() {
     local name="$1"
     local fn="$2"
@@ -316,6 +396,10 @@ run_test "check ordering by file name" test_check_ordering
 run_test "unmanaged entry conflict" test_unmanaged_entry_conflict
 run_test "stale managed symlink cleanup" test_stale_managed_symlink_cleanup
 run_test "invalid manifest fails" test_invalid_manifest_fails
+run_test "help does not install" test_help_does_not_install
+run_test "unknown option fails" test_unknown_option_fails
+run_test "dry-run does not write" test_dry_run_does_not_write
+run_test "short dry-run option does not write" test_short_dry_run_option_does_not_write
 
 log "Passed: $PASS_COUNT"
 log "Failed: $FAIL_COUNT"

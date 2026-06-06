@@ -5,6 +5,36 @@ if [ -z "${BASH_VERSION:-}" ]; then
     exit 1
 fi
 
+usage() {
+    cat <<'USAGE'
+Usage: bash install.sh [--dry-run|-n]
+
+Options:
+  -n, --dry-run  Validate and show planned changes without writing them.
+  -h, --help     Show this help.
+USAGE
+}
+
+INSTALL_DRY_RUN=0
+
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        -n|--dry-run)
+            INSTALL_DRY_RUN=1
+            ;;
+        -h|--help)
+            usage
+            exit 0
+            ;;
+        *)
+            echo "Error: unknown option: $1" >&2
+            usage >&2
+            exit 1
+            ;;
+    esac
+    shift
+done
+
 DOTPATH=${DOTPATH:-"$HOME/dotfiles"}
 OH_MY_ZSH_THEMES=${OH_MY_ZSH_THEMES:-"$HOME/.oh-my-zsh/themes"}
 
@@ -28,6 +58,11 @@ for lib in common profile reconcile; do
     fi
     . "$lib_path"
 done
+
+if is_dry_run; then
+    log_section "Mode"
+    log_step "Dry-run mode: no symlink, directory, or cleanup changes will be written by the common installer"
+fi
 
 log_section "Preflight"
 log_step "Load active profile manifests"
@@ -65,9 +100,18 @@ if [ -d "$OH_MY_ZSH_THEMES" ]; then
     log_step "Target: $OH_MY_ZSH_THEMES"
     for theme in "$DOTPATH"/*.zsh-theme; do
         theme_dest="$OH_MY_ZSH_THEMES/$(basename "$theme")"
-        ln -snf "$theme" "$theme_dest" || exit 1
-        log_link "$theme_dest" "$theme"
+        if is_dry_run; then
+            log_would_link "$theme_dest" "$theme"
+        else
+            ln -snf "$theme" "$theme_dest" || exit 1
+            log_link "$theme_dest" "$theme"
+        fi
     done
 else
     log_step "Skip: $OH_MY_ZSH_THEMES does not exist"
+fi
+
+if is_dry_run; then
+    log_section "Dry-run Result"
+    log_step "OK: no conflicts detected; no changes were written by the common installer"
 fi

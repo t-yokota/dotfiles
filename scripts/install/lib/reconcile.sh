@@ -4,6 +4,32 @@
 # by this dotfiles checkout, prune stale managed links, and create the desired
 # top-level and managed-surface symlinks.
 
+remove_managed_path() {
+    local description="$1"
+    local path="$2"
+
+    if is_dry_run; then
+        log_substep "Would remove $description: $path"
+        return 0
+    fi
+
+    log_substep "Remove $description: $path"
+    rm -f "$path"
+}
+
+ensure_directory() {
+    local dir="$1"
+
+    [ -d "$dir" ] && return 0
+
+    if is_dry_run; then
+        log_substep "Would create directory: $dir"
+        return 0
+    fi
+
+    mkdir -p "$dir"
+}
+
 # A symlink is managed only when it points back into the expected dotfiles source.
 is_managed_symlink() {
     local link_path="$1"
@@ -116,6 +142,11 @@ link_managed_entry() {
 
     check_managed_entry "$dest_path" "$managed_root" || return 1
 
+    if is_dry_run; then
+        log_would_link "$dest_path" "$source_path"
+        return 0
+    fi
+
     ln -snf "$source_path" "$dest_path" || return 1
     log_link "$dest_path" "$source_path"
 }
@@ -132,8 +163,7 @@ cleanup_managed_symlinks() {
 
     if [ "$container_policy" != "allow-container-symlink" ] && [ -L "$dest_dir" ]; then
         if is_managed_symlink "$dest_dir" "$source_dir"; then
-            log_substep "Remove managed container symlink: $dest_dir"
-            rm -f "$dest_dir"
+            remove_managed_path "managed container symlink" "$dest_dir"
             return 0
         fi
 
@@ -152,8 +182,7 @@ cleanup_managed_symlinks() {
             target=$(readlink "$dest")
             child_source="$source_dir/$name"
             if [ ! -e "$target" ] || { should_skip_entry "$skipset" "$name" && ! is_surface_source "$child_source"; }; then
-                log_substep "Remove stale or skipped symlink: $dest"
-                rm -f "$dest"
+                remove_managed_path "stale or skipped symlink" "$dest"
             fi
         fi
     done
@@ -167,8 +196,7 @@ cleanup_whole_surface() {
     if is_managed_symlink "$dest_path" "$source_path"; then
         target=$(readlink "$dest_path")
         if [ ! -e "$target" ]; then
-            log_substep "Remove stale whole-entry symlink: $dest_path"
-            rm -f "$dest_path"
+            remove_managed_path "stale whole-entry symlink" "$dest_path"
         fi
     fi
 }
@@ -185,8 +213,7 @@ cleanup_root_symlinks() {
         if is_managed_symlink "$dest" "$DOTPATH"; then
             target=$(readlink "$dest")
             if [ ! -e "$target" ] || should_skip_root_entry "$name"; then
-                log_substep "Remove stale or reserved top-level symlink: $dest"
-                rm -f "$dest"
+                remove_managed_path "stale or reserved top-level symlink" "$dest"
             fi
         fi
     done
@@ -200,7 +227,7 @@ link_managed_entries() {
     local f name dest child_source
 
     check_destination_container "$dest_dir" || return 1
-    mkdir -p "$dest_dir"
+    ensure_directory "$dest_dir" || return 1
 
     cleanup_managed_symlinks "$source_dir" "$dest_dir" "$skipset" || return 1
 
@@ -213,7 +240,7 @@ link_managed_entries() {
         if should_skip_entry "$skipset" "$name"; then
             log_substep "Skip runtime or separately managed entry: $f"
             if is_managed_symlink "$dest" "$source_dir" && ! is_surface_source "$child_source"; then
-                rm -f "$dest"
+                remove_managed_path "previously linked skipped entry" "$dest"
             fi
             continue
         fi
@@ -230,7 +257,7 @@ link_whole_surface() {
     [ -e "$source_path" ] || [ -L "$source_path" ] || return 0
 
     check_whole_destination_parent "$dest_path" || return 1
-    mkdir -p "$parent"
+    ensure_directory "$parent" || return 1
     link_managed_entry "$source_path" "$dest_path" "$source_path" || return 1
 }
 
