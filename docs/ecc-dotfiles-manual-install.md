@@ -383,8 +383,18 @@ ECC の実体を dotfiles 側に受けたあと、実 HOME へは dotfiles の `
 
 symlink 作成前の branch-specific install check は、active profile の `checks.d/*.sh` から file name の glob 順で読み込みます。この profile では `profiles/ecc/checks.d/10-local-state.sh` が担当します。`profile/ecc/*` branch では、Claude 側は `~/dotfiles/.claude/ecc/install-state.json`、Codex 側は `~/dotfiles/.codex/dotfiles-profile-ecc-sync-state.json` を確認します。clean clone や別環境で pull した直後にこれらがない場合、実 HOME へ未セットアップの ECC surface を出さないために `install.sh` は停止します。`profile/ecc-base` は install output を持たないため、local state check の対象外です。
 
+実 HOME に反映する前に、まず profile 自体を一時 HOME に適用できるか確認します。`test-profile.sh` は `/tmp` に作った HOME fixture へ `install.sh` を実行するため、実 HOME は変更しません。ここでは dotfiles 側の ECC output、profile manifest、branch-specific check が揃っているかを確認します。
+
 ```bash
 cd ~/dotfiles
+bash profiles/ecc/bin/test-profile.sh
+```
+
+その後、実 HOME に対する conflict や作成予定 symlink を `--dry-run` で確認します。`test-profile.sh` は実 HOME の既存ファイルとの衝突を見ないため、実適用前には `install.sh --dry-run` も実行します。
+
+```bash
+cd ~/dotfiles
+bash install.sh --dry-run
 bash install.sh
 ```
 
