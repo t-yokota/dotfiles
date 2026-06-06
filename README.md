@@ -13,6 +13,18 @@ bash install.sh
 
 `install.sh` は Bash 前提です。`sh install.sh` では実行せず、誤って Bash 以外から起動された場合は早期に終了します。
 
+installer の動作確認には、実際の `~/dotfiles` や `$HOME` を変更しない test script を使えます。この script は `/tmp` に一時的な dotfiles checkout と HOME directory を作り、symlink 作成、conflict 検出、stale symlink cleanup、profile check の実行順を検証します。
+
+```bash
+bash scripts/install/test-install.sh
+```
+
+各 fixture で実行した `install.sh` の詳細ログを確認したい場合は、`--verbose` を付けます。
+
+```bash
+bash scripts/install/test-install.sh --verbose
+```
+
 ## `install.sh` の仕組み
 
 `install.sh` は `DOTPATH=~/dotfiles` を起点に、現在 checkout されている branch の内容を実 HOME に symlink します。Conflict をチェックして既存の通常ファイルを上書きせず、Cleanup の際にはこの dotfiles checkout が作った symlink だけを対象にします。
