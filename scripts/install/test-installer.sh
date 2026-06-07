@@ -369,7 +369,7 @@ test_profile_smoke_runner() {
     write_file "$fixture/.tool/items/example.txt" "item" || return 1
     write_file "$fixture/.tool/package/manifest.json" "{}" || return 1
 
-    if ! bash "$fixture/scripts/install/test-profile.sh" \
+    if ! DOTPATH="$fixture" bash "$fixture/scripts/install/test-profile.sh" \
         --profile profiles/test \
         --branch "$TEST_BRANCH" > "$output" 2>&1
     then
@@ -391,7 +391,7 @@ test_profile_smoke_runner_rejects_invalid_profile_manifest() {
     make_fixture "$fixture" || return 1
     write_file "$fixture/profiles/test/profile.tsv" "branch	$TEST_BRANCH	extra" || return 1
 
-    if bash "$fixture/scripts/install/test-profile.sh" \
+    if DOTPATH="$fixture" bash "$fixture/scripts/install/test-profile.sh" \
         --profile profiles/test \
         --branch "$TEST_BRANCH" > "$output" 2>&1
     then
