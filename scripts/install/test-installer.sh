@@ -361,6 +361,28 @@ test_profile_smoke_runner() {
     assert_file_contains "$output" "PASS: profile installs into an isolated HOME fixture" || return 1
 }
 
+test_profile_smoke_runner_rejects_invalid_profile_manifest() {
+    local fixture="$TEST_ROOT/profile-runner-invalid-manifest-fixture"
+    local output="$TEST_ROOT/profile-runner-invalid-manifest-output.log"
+
+    make_fixture "$fixture" || return 1
+    write_file "$fixture/profiles/test/profile.tsv" "branch	$TEST_BRANCH	extra" || return 1
+
+    if bash "$fixture/scripts/install/test-profile.sh" \
+        --profile profiles/test \
+        --branch "$TEST_BRANCH" > "$output" 2>&1
+    then
+        log "Profile smoke runner unexpectedly succeeded despite invalid profile manifest"
+        return 1
+    fi
+
+    if [ "$VERBOSE" -eq 1 ]; then
+        show_output "profile smoke runner invalid manifest log" "$output"
+    fi
+
+    assert_file_contains "$output" "invalid installer manifest" || return 1
+}
+
 test_aggregate_runner_runs_active_profile() {
     local fixture="$TEST_ROOT/aggregate-runner-fixture"
     local output="$TEST_ROOT/aggregate-runner-output.log"
@@ -593,6 +615,7 @@ run_test "shell theme links" test_shell_theme_links
 run_test "shell theme conflict fails" test_shell_theme_conflict_fails
 run_test "check ordering by file name" test_check_ordering
 run_test "profile smoke runner" test_profile_smoke_runner
+run_test "profile smoke runner rejects invalid profile manifest" test_profile_smoke_runner_rejects_invalid_profile_manifest
 run_test "aggregate runner runs active profile" test_aggregate_runner_runs_active_profile
 run_test "aggregate runner rejects invalid profile manifest" test_aggregate_runner_rejects_invalid_profile_manifest
 run_test "unmanaged entry conflict" test_unmanaged_entry_conflict

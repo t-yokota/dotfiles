@@ -14,6 +14,16 @@ BRANCH=${DOTFILES_BRANCH:-}
 VERBOSE=0
 KEEP_TMP=0
 
+INSTALL_LIB_DIR="$DOTPATH/scripts/install/lib"
+for lib in common profile; do
+    lib_path="$INSTALL_LIB_DIR/$lib.sh"
+    if [ ! -f "$lib_path" ]; then
+        echo "Error: missing installer library: $lib_path" >&2
+        exit 1
+    fi
+    . "$lib_path"
+done
+
 usage() {
     cat <<'USAGE'
 Usage: bash scripts/install/test-profile.sh --profile profiles/<name> [--branch <branch>] [--verbose] [--keep-tmp]
@@ -113,13 +123,6 @@ cleanup() {
 
 trap cleanup EXIT
 
-line_is_ignored() {
-    case "$1" in
-        ""|\#*) return 0 ;;
-        *) return 1 ;;
-    esac
-}
-
 assert_file() {
     local path="$1"
     local label="$2"
@@ -152,13 +155,7 @@ assert_symlink_target() {
     [ "$actual" = "$expected" ] || fail "expected $path -> $expected, got $actual"
 }
 
-resolve_dotpath_path() {
-    local rel="$1"
-
-    printf '%s/%s\n' "$DOTPATH" "$rel"
-}
-
-resolve_home_path() {
+resolve_test_home_path() {
     local rel="$1"
 
     printf '%s/%s\n' "$TEST_HOME" "$rel"
@@ -169,7 +166,7 @@ detect_branch() {
         return 0
     fi
 
-    BRANCH=$(git -C "$DOTPATH" branch --show-current 2>/dev/null || true)
+    BRANCH=$(cd "$DOTPATH" && get_current_branch)
     [ -n "$BRANCH" ] || fail "could not detect current branch; pass --branch explicitly"
 }
 
@@ -179,23 +176,35 @@ check_profile_branch_patterns() {
     local expected_env="profile/$PROFILE_NAME/*"
     local has_base=0
     local has_env=0
-    local matches_branch=0
-    local line kind value rest
+    local line line_number kind value rest
+    local match_rc
 
+    line_number=0
     while IFS= read -r line; do
+        line_number=$((line_number + 1))
         line_is_ignored "$line" && continue
+        validate_profile_manifest_line "$manifest" "$line_number" "$line" || return 1
         IFS=$'\t' read -r kind value rest <<< "$line"
         [ "$kind" = "branch" ] || continue
         [ "$value" = "$expected_base" ] && has_base=1
         [ "$value" = "$expected_env" ] && has_env=1
-        if [[ "$BRANCH" == $value ]]; then
-            matches_branch=1
-        fi
     done < "$manifest"
 
     [ "$has_base" -eq 1 ] || fail "profile.tsv must include: branch	$expected_base" || return 1
     [ "$has_env" -eq 1 ] || fail "profile.tsv must include: branch	$expected_env" || return 1
-    [ "$matches_branch" -eq 1 ] || fail "branch does not activate this profile: $BRANCH" || return 1
+
+    profile_matches_branch "$manifest" "$BRANCH"
+    match_rc=$?
+    case "$match_rc" in
+        0) ;;
+        1)
+            fail "branch does not activate this profile: $BRANCH"
+            return 1
+            ;;
+        *)
+            return 1
+            ;;
+    esac
 }
 
 profile_manifest_value() {
@@ -250,7 +259,7 @@ check_surface_outputs() {
         [ "$kind" = "surface" ] || continue
 
         source_path=$(resolve_dotpath_path "$source_rel")
-        dest_path=$(resolve_home_path "$dest_rel")
+        dest_path=$(resolve_test_home_path "$dest_rel")
         [ -e "$source_path" ] || [ -L "$source_path" ] || continue
 
         case "$strategy" in
@@ -279,12 +288,13 @@ main() {
     assert_file "$DOTPATH/install.sh" "installer entrypoint" || return 1
     assert_file "$PROFILE_DIR/profile.tsv" "profile manifest" || return 1
 
+    check_profile_branch_patterns || return 1
+
     skipsets_rel=$(profile_manifest_value "$PROFILE_DIR/profile.tsv" "skipsets" "skipsets.tsv")
     surfaces_rel=$(profile_manifest_value "$PROFILE_DIR/profile.tsv" "surfaces" "surfaces.tsv")
     assert_file "$PROFILE_DIR/$skipsets_rel" "skipsets manifest" || return 1
     assert_file "$PROFILE_DIR/$surfaces_rel" "surfaces manifest" || return 1
 
-    check_profile_branch_patterns || return 1
     run_installer_fixture || return 1
     check_surface_outputs || return 1
 
