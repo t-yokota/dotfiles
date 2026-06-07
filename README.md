@@ -177,6 +177,8 @@ checks	<profile-relative-path>
 - `skipsets`: skipset 定義 file です。省略時は `skipsets.tsv` です。
 - `checks`: branch-specific check directory です。省略時は `checks.d` です。
 
+`branch` は複数行書けます。`surfaces`, `skipsets`, `checks` は省略可能ですが、それぞれ1回までです。重複して書いた場合は invalid として扱います。
+
 `surfaces.tsv` は、dotfiles 側の desired state を HOME 側にどの粒度で出すかを定義します。
 
 ```text

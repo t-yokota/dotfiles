@@ -399,6 +399,28 @@ surface	entries	.tool	.tool	missing-skipset	Broken surface" || return 1
     assert_file_contains "$output" "references unknown skipset: missing-skipset" || return 1
 }
 
+test_duplicate_profile_manifest_kind_fails() {
+    local fixture="$TEST_ROOT/duplicate-profile-kind-fixture"
+    local home="$TEST_ROOT/duplicate-profile-kind-home"
+    local output="$TEST_ROOT/duplicate-profile-kind-output.log"
+
+    setup_fixture "$fixture" "$home" || return 1
+    write_file "$fixture/profiles/test/profile.tsv" \
+"branch	$TEST_BRANCH
+skipsets	skipsets.tsv
+surfaces	surfaces.tsv
+surfaces	other-surfaces.tsv
+checks	checks.d" || return 1
+
+    if run_install "$fixture" "$home" "$TEST_BRANCH" "$output"; then
+        log "Install unexpectedly succeeded despite duplicate profile kind"
+        return 1
+    fi
+
+    assert_file_contains "$output" "invalid installer manifest" || return 1
+    assert_file_contains "$output" "duplicate profile kind: surfaces" || return 1
+}
+
 test_invalid_surface_path_fails() {
     local fixture="$TEST_ROOT/invalid-surface-path-fixture"
     local home="$TEST_ROOT/invalid-surface-path-home"
@@ -521,6 +543,7 @@ run_test "profile smoke runner" test_profile_smoke_runner
 run_test "unmanaged entry conflict" test_unmanaged_entry_conflict
 run_test "stale managed symlink cleanup" test_stale_managed_symlink_cleanup
 run_test "invalid manifest fails" test_invalid_manifest_fails
+run_test "duplicate profile manifest kind fails" test_duplicate_profile_manifest_kind_fails
 run_test "invalid surface path fails" test_invalid_surface_path_fails
 run_test "help does not install" test_help_does_not_install
 run_test "unknown option fails" test_unknown_option_fails

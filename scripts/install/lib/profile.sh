@@ -355,6 +355,9 @@ load_profile_manifest() {
     local surfaces_file="surfaces.tsv"
     local skipsets_file="skipsets.tsv"
     local checks_dir="checks.d"
+    local seen_surfaces=0
+    local seen_skipsets=0
+    local seen_checks=0
 
     line_number=0
     while IFS= read -r line; do
@@ -363,9 +366,30 @@ load_profile_manifest() {
         validate_profile_manifest_line "$manifest" "$line_number" "$line" || return 1
         IFS=$'\t' read -r kind value rest <<< "$line"
         case "$kind" in
-            surfaces) surfaces_file="$value" ;;
-            skipsets) skipsets_file="$value" ;;
-            checks) checks_dir="$value" ;;
+            surfaces)
+                if [ "$seen_surfaces" -eq 1 ]; then
+                    manifest_error "$manifest" "$line_number" "duplicate profile kind: surfaces"
+                    return 1
+                fi
+                seen_surfaces=1
+                surfaces_file="$value"
+                ;;
+            skipsets)
+                if [ "$seen_skipsets" -eq 1 ]; then
+                    manifest_error "$manifest" "$line_number" "duplicate profile kind: skipsets"
+                    return 1
+                fi
+                seen_skipsets=1
+                skipsets_file="$value"
+                ;;
+            checks)
+                if [ "$seen_checks" -eq 1 ]; then
+                    manifest_error "$manifest" "$line_number" "duplicate profile kind: checks"
+                    return 1
+                fi
+                seen_checks=1
+                checks_dir="$value"
+                ;;
         esac
     done < "$manifest"
 
