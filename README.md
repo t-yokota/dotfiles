@@ -235,7 +235,7 @@ profiles/<name>/checks.d/*.sh
 
 `profile.tsv` で branch pattern に一致した active profile の check だけが、symlink 作成前に実行されます。check は file name の glob 順、つまり通常は辞書順で実行されます。<br>そのため順序を明示したい場合は、`10-local-state.sh`, `20-conflicts.sh` のように番号 prefix を付けます。profile branch に必要な local install state がない場合や、実 HOME 側に危険な競合がある場合は、ここで停止させます。
 
-たとえば Everything Claude Code (https://github.com/affaan-m/ECC) のような外部 tool を profile の元にする場合、その tool が持つ installer や sync step を dotfiles 側で先に実行してから HOME 側に適用することになります。<br>check script によって tool の install 時に生成される install-state や local marker の存在を確認した上で、profile を HOME に適用することが可能です。
+たとえば Everything Claude Code (https://github.com/affaan-m/ECC) のような外部 tool を profile の元にする場合、その tool が持つ installer や sync step を dotfiles 側で先に実行してから HOME 側に適用することになります。<br>check script によって tool の install 時に生成される install-state や local marker の存在、必要に応じてその中身を確認した上で、profile を HOME に適用することが可能です。
 
 check script は選択中の branch の profile を現在の環境に適用する準備が整っているかを判定するためのものなので、check 内容は profile に応じたスクリプトの実装によって定義することができ、上記に限られる必要はありません。
 
