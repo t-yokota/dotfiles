@@ -7,6 +7,7 @@
 .claude/session*
 .claude/history.jsonl
 .claude/logs/
+.claude/backups/
 .claude/cache/
 .claude/caches/
 .claude/tmp/
@@ -24,6 +25,47 @@
 .claude/*.sqlite
 .claude/*.sqlite-wal
 .claude/*.sqlite-shm
+
+# Claude embedded agent runtime/cache state
+.claude/.agents/logs/
+.claude/.agents/backups/
+.claude/.agents/cache/
+.claude/.agents/caches/
+.claude/.agents/tmp/
+.claude/.agents/plugin-cache/
+.claude/.agents/sessions/
+.claude/.agents/.credentials.json
+.claude/.agents/credentials.json
+.claude/.agents/config.json
+.claude/.agents/models_cache.json
+.claude/.agents/session_index.jsonl
+.claude/.agents/*.log
+.claude/.agents/*.db
+.claude/.agents/*.sqlite
+.claude/.agents/*.sqlite-wal
+.claude/.agents/*.sqlite-shm
+
+# Claude collection-local runtime/cache state
+.claude/rules/logs/
+.claude/rules/backups/
+.claude/rules/cache/
+.claude/rules/caches/
+.claude/rules/tmp/
+.claude/rules/*.log
+.claude/rules/*.db
+.claude/rules/*.sqlite
+.claude/rules/*.sqlite-wal
+.claude/rules/*.sqlite-shm
+.claude/skills/logs/
+.claude/skills/backups/
+.claude/skills/cache/
+.claude/skills/caches/
+.claude/skills/tmp/
+.claude/skills/*.log
+.claude/skills/*.db
+.claude/skills/*.sqlite
+.claude/skills/*.sqlite-wal
+.claude/skills/*.sqlite-shm
 
 # Codex runtime, credential, backup, and generated hook state
 .codex/ecc-install-state.json

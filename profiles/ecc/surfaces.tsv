@@ -1,4 +1,6 @@
 # kind	strategy	source	dest	skipset	label
+
+# Claude Code root and ECC-managed child collections.
 surface	entries	.claude	.claude	claude-root	Claude Code root config
 surface	entries	.claude/.agents	.claude/.agents	claude-dot-agents	Claude embedded agent root
 surface	entries	.claude/.agents/plugins	.claude/.agents/plugins	none	Claude embedded agent plugins
@@ -12,8 +14,12 @@ surface	entries	.claude/skills/ecc	.claude/skills/ecc	none	Claude ECC skills
 surface	whole	.claude/hooks	.claude/hooks	none	Claude hooks package
 surface	whole	.claude/scripts	.claude/scripts	none	Claude scripts package
 surface	whole	.claude/mcp-configs	.claude/mcp-configs	none	Claude MCP configs package
+
+# Codex root and ECC sync output.
 surface	entries	.codex	.codex	codex-root	Codex root config
 surface	entries	.codex/agents	.codex/agents	none	Codex agent roles
 surface	entries	.codex/prompts	.codex/prompts	none	Codex prompts
+
+# User-level Codex skills bundle.
 surface	entries	.agents	.agents	agents-root	user-level agent root
 surface	entries	.agents/skills	.agents/skills	none	user-level Codex skills

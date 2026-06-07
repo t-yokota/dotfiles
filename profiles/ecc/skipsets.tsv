@@ -1,9 +1,12 @@
 # kind	name	pattern
+
+# .claude root: local lifecycle/runtime state and child surfaces managed below.
 skipset	claude-root	ecc
 skipset	claude-root	projects
 skipset	claude-root	session*
 skipset	claude-root	history.jsonl
 skipset	claude-root	logs
+skipset	claude-root	backups
 skipset	claude-root	cache
 skipset	claude-root	caches
 skipset	claude-root	tmp
@@ -29,6 +32,8 @@ skipset	claude-root	skills
 skipset	claude-root	hooks
 skipset	claude-root	scripts
 skipset	claude-root	mcp-configs
+
+# .claude/.agents root: local runtime state and child surfaces managed below.
 skipset	claude-dot-agents	skills
 skipset	claude-dot-agents	plugins
 skipset	claude-dot-agents	logs
@@ -36,6 +41,7 @@ skipset	claude-dot-agents	backups
 skipset	claude-dot-agents	cache
 skipset	claude-dot-agents	caches
 skipset	claude-dot-agents	tmp
+skipset	claude-dot-agents	plugin-cache
 skipset	claude-dot-agents	sessions
 skipset	claude-dot-agents	.credentials.json
 skipset	claude-dot-agents	credentials.json
@@ -47,6 +53,8 @@ skipset	claude-dot-agents	*.db
 skipset	claude-dot-agents	*.sqlite
 skipset	claude-dot-agents	*.sqlite-wal
 skipset	claude-dot-agents	*.sqlite-shm
+
+# .claude/rules root: ECC rules are managed as a child surface.
 skipset	claude-rules-root	ecc
 skipset	claude-rules-root	logs
 skipset	claude-rules-root	backups
@@ -58,6 +66,8 @@ skipset	claude-rules-root	*.db
 skipset	claude-rules-root	*.sqlite
 skipset	claude-rules-root	*.sqlite-wal
 skipset	claude-rules-root	*.sqlite-shm
+
+# .claude/skills root: ECC skills are managed as a child surface.
 skipset	claude-skills-root	ecc
 skipset	claude-skills-root	logs
 skipset	claude-skills-root	backups
@@ -69,6 +79,8 @@ skipset	claude-skills-root	*.db
 skipset	claude-skills-root	*.sqlite
 skipset	claude-skills-root	*.sqlite-wal
 skipset	claude-skills-root	*.sqlite-shm
+
+# .codex root: local runtime state and child surfaces managed below.
 skipset	codex-root	auth.json
 skipset	codex-root	sessions
 skipset	codex-root	logs
@@ -94,6 +106,8 @@ skipset	codex-root	*.sqlite-wal
 skipset	codex-root	*.sqlite-shm
 skipset	codex-root	agents
 skipset	codex-root	prompts
+
+# .agents root: local runtime state and Codex skills managed below.
 skipset	agents-root	logs
 skipset	agents-root	backups
 skipset	agents-root	cache
