@@ -1,6 +1,6 @@
 # ECC Dotfiles Manual Install Procedure
 
-- Last reviewed: 2026-06-07
+- Last reviewed: 2026-06-08
 - ECC version: 2.0.0-rc.1
 
 この手順書では、dotfiles の `profile/ecc-base` branch から環境ごとの `profile/ecc/*` branch を切り、自環境に対して Everything Claude Code (ECC) の manual install を実施する方法を説明します。
@@ -16,6 +16,7 @@
 - dotfiles の base branch は `profile/ecc-base` を使う。ECC install outputs は `profile/ecc-base` から切った `profile/ecc/*` branch に取り込む。
 - Claude 側は ECC の plugin route ではなく manual installer route を使って profile をインストールする。plugin route を重ねて使用しないようにする。
 - Codex 側は ECC の plugin route ではなく sync script route を使って profile をインストールする。plugin route を重ねて使用しないようにする。
+- ECC installer / sync / local marker の検証に `node` / `npm` を使うため、ECC repo 側の依存関係を通常 HOME で解決しておく。
 - 最初に dry-run で配置先を確認してからインストールを実施する。
 
 この手順書のコマンド例は、最初に以下の変数を定義した上で使用します。`DOTPATH` には、自分の dotfiles の場所を指定します。`ECC_REPO` には、自分の環境における ECC リポジトリの clone 先を指定します。
@@ -24,6 +25,17 @@
 export DOTPATH="$HOME/dotfiles"
 export ECC_REPO="/path/to/everything-claude-code"
 ```
+
+## Setup checklist
+
+新しい環境では、詳細手順に入る前に次の流れだけを押さえておきます。
+
+1. `profile/ecc-base` から `profile/ecc/*` branch を作る。
+2. `HOME="$DOTPATH"` で Claude manual installer を実行し、ECC output を dotfiles 側の `.claude/` に受ける。
+3. `CODEX_HOME="$DOTPATH/.codex"` で Codex sync を実行し、Codex output を dotfiles 側の `.codex/` に受ける。
+4. ECC repo の `.agents/skills/` を dotfiles 側の `.agents/skills/` に取り込む。
+5. `profiles/ecc/bin/write-codex-sync-state.sh` で Codex 側の local marker を作る。
+6. `bash scripts/install/test-all.sh` と `bash install.sh --dry-run` を通してから、実 HOME に `bash install.sh` で反映する。
 
 ## Branch model
 
@@ -37,8 +49,8 @@ export ECC_REPO="/path/to/everything-claude-code"
 ```bash
 # branch の作成例
 cd "$DOTPATH"
-git checkout profile/ecc-base
-git checkout -b profile/ecc/full # --profile full で Claude manual installer を実行する例
+git switch profile/ecc-base
+git switch -c profile/ecc/full # --profile full で Claude manual installer を実行する例
 ```
 
 branch 名は運用上の目印です。`profile/ecc/full/<env>` のようにPC名などの環境名を含めても問題ありません。`install.sh` は `profile/ecc-base` では install output 用の local state check を行わず、`profile/ecc/*` で実行するときに local state check を行います。
@@ -174,7 +186,7 @@ manual install 後は Claude Code の `/hooks` で ECC hooks が見えている�
 ## 1. dotfiles branch を確認する
 
 ```bash
-cd ~/dotfiles
+cd "$DOTPATH"
 git branch --show-current
 ```
 
@@ -198,7 +210,7 @@ git switch profile/ecc/full
 Codex sync は `$CODEX_HOME/config.toml` を merge の入力として要求するため、base branch に `.codex/config.toml` がない場合だけ空ファイルを作ります。
 
 ```bash
-cd ~/dotfiles
+cd "$DOTPATH"
 mkdir -p .codex
 touch .codex/config.toml
 ```
@@ -316,7 +328,7 @@ GIT_CONFIG_GLOBAL="$DOTPATH/.gitconfig.local" \
 bash scripts/sync-ecc-to-codex.sh
 ```
 
-Codex sync route には、Claude manual installer の `.claude/ecc/install-state.json` に相当する state がありません。そのため、sync output と skills bundle を揃えたあとで local marker を作ります。marker 作成は section 8 で行います。
+Codex sync route には、Claude manual installer の `.claude/ecc/install-state.json` に相当する state がありません。そのため、sync output と skills bundle を揃えたあとで local marker を作ります。marker 作成は section 9 で行います。
 
 global hooks の生成自体も避けたい場合は、この sync apply は保留し、dry-run の結果を見ながら `AGENTS.md`, `config.toml`, `agents`, `prompts` を個別に取り込む方針にしてください。
 
@@ -366,16 +378,18 @@ cp -R "$ECC_REPO/.agents/skills/." .agents/skills/
 git diff -- .agents/skills
 ```
 
-Claude manual installer には `.claude/ecc/install-state.json` がありますが、今回使う Codex sync route には同等の install-state がありません。最後に `profiles/ecc/bin/write-codex-sync-state.sh` を実行し、Codex sync output と skills bundle を確認済みであることを示す local marker を作ります。この marker は実行履歴ではなく、現時点の dotfiles / ECC repo / generated output を検査して書く snapshot です。
+## 9. Codex local marker を作る
 
-手動で sync / copy を個別実行した場合でも、最後にこの marker を作れば `install.sh` の `profile/ecc/*` preflight が通る状態になります。
+Claude manual installer には `.claude/ecc/install-state.json` がありますが、今回使う Codex sync route には同等の install-state がありません。そこで `profiles/ecc/bin/write-codex-sync-state.sh` を実行し、Codex sync output と skills bundle を確認済みであることを示す local marker を作ります。この marker は実行履歴ではなく、現時点の dotfiles / ECC repo / generated output を検査して書く snapshot です。
+
+手動で sync / copy を個別実行した場合でも、最後にこの marker を作れば Codex 側の `profile/ecc/*` preflight 条件を満たせます。Claude 側の preflight には、別途 `.claude/ecc/install-state.json` がこの checkout の `.claude` を指している必要があります。
 
 ```bash
 DOTPATH="$DOTPATH" ECC_REPO="$ECC_REPO" \
 bash profiles/ecc/bin/write-codex-sync-state.sh
 ```
 
-## 9. dotfiles の install.sh で実 HOME へ symlink する
+## 10. dotfiles の install.sh で実 HOME へ symlink する
 
 ECC の実体を dotfiles 側に受けたあと、実 HOME へは dotfiles の `install.sh` で反映します。
 
@@ -388,21 +402,21 @@ symlink 作成前の branch-specific install check は、active profile の `che
 `profile/ecc/*` branch では、profile smoke test の中で dotfiles 側の ECC output、profile manifest、branch-specific check が揃っているかを確認します。`profile/ecc-base` では install output を持たないため、local state check は skip されます。
 
 ```bash
-cd ~/dotfiles
+cd "$DOTPATH"
 bash scripts/install/test-all.sh
 ```
 
 profile smoke test だけを切り分けたい場合は、profile 側の wrapper を直接実行します。
 
 ```bash
-cd ~/dotfiles
+cd "$DOTPATH"
 bash profiles/ecc/bin/test-profile.sh
 ```
 
 その後、実 HOME に対する conflict や作成予定 symlink を `--dry-run` で確認します。verification script は実 HOME の既存ファイルとの衝突を見ないため、実適用前には `install.sh --dry-run` も実行します。
 
 ```bash
-cd ~/dotfiles
+cd "$DOTPATH"
 bash install.sh --dry-run
 bash install.sh
 ```
@@ -425,7 +439,7 @@ entry 単位で扱う主な surface:
 
 既存の collection directory 自体は実 HOME に残せます。ただし `~/.claude/agents/<agent>`, `~/.codex/prompts/<prompt>`, `~/.agents/skills/<skill>` など、dotfiles が同じ名前で symlink しようとする entry が non-managed file / directory として存在する場合、`install.sh` は symlink 作成前の preflight で error にします。既存内容を残す場合は名前の衝突を解消し、同じ entry として管理したい場合は dotfiles 側へ統合します。
 
-## 10. commit / ignore 方針
+## 11. commit / ignore 方針
 
 `profile/ecc-base` は ECC profile を作るための管理体制を表し、`profile/ecc/*` branch は ECC を使うときの user-level agent profile を表します。instruction / config / agent asset のうち、その profile の構成として再現・差分確認したいものは commit し、環境ごとに再生成される runtime state や credential は commit しません。
 
@@ -451,12 +465,14 @@ ignore 対象:
 - `.codex/logs/`
 - `.claude/projects/`
 - `.claude/session*`
-- `.agents/logs/`, `.agents/cache/`, `.agents/tmp/`
+- `.claude/backups/`, `.claude/.agents/` 配下の logs / backups / cache / sessions / credentials
+- `.claude/rules/`, `.claude/skills/` 配下の logs / backups / cache / database files
+- `.agents/logs/`, `.agents/backups/`, `.agents/cache/`, `.agents/tmp/`
 - credentials, tokens, history databases, caches
 
 ignore 対象は `.gitignore` でも enforce します。ignore 対象のファイルは branch を切り替えても作業ツリーに残ります。commit 対象は、`profile/ecc-base` の管理体制、または `profile/ecc/*` の desired state として再現・差分確認したいものに限定します。ignore 対象は環境ごとの runtime state に限定します。
 
-## 11. Uninstall / Regenerate 手順
+## 12. Uninstall / Regenerate 手順
 
 この dotfiles では、uninstall / cleanup の対象を layer ごとに分けます。実 HOME 側は symlink layer、`~/dotfiles` 側は tracked desired state、ECC repo 側の lifecycle command は `HOME=$DOTPATH` で作った installer output を扱います。
 
@@ -592,14 +608,14 @@ git config --global --unset core.hooksPath
 
 hook body 自体は ignored output なので、不要になったら `$DOTPATH/.codex/git-hooks/` を削除します。再度使う場合は `scripts/codex/install-global-git-hooks.sh` または Codex sync apply で再生成します。
 
-## 12. 運用上の注意点
+## 13. 運用上の注意点
 
 ### Codex sync の入力 config を用意する
 
 `scripts/sync-ecc-to-codex.sh` は `$CODEX_HOME/config.toml` を要求します。まっさらな `.codex` では、先に空ファイルを作ります。
 
 ```bash
-cd ~/dotfiles
+cd "$DOTPATH"
 mkdir -p .codex
 touch .codex/config.toml
 ```
