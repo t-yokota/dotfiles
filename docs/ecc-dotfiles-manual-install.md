@@ -381,7 +381,7 @@ ECC の実体を dotfiles 側に受けたあと、実 HOME へは dotfiles の `
 
 `install.sh` は共通の symlink engine です。実際にどの directory を surface として扱うかは、`profiles/*/profile.tsv` と、その profile が指す `surfaces.tsv`, `skipsets.tsv` から読み込みます。この profile では `profiles/ecc/` が `profile/ecc-base`, `profile/ecc/*` 用の surface 定義を提供します。
 
-symlink 作成前の branch-specific install check は、active profile の `checks.d/*.sh` から file name の glob 順で読み込みます。この profile では `profiles/ecc/checks.d/10-local-state.sh` が担当します。`profile/ecc/*` branch では、Claude 側は `~/dotfiles/.claude/ecc/install-state.json`、Codex 側は `~/dotfiles/.codex/dotfiles-profile-ecc-sync-state.json` を確認します。clean clone や別環境で pull した直後にこれらがない場合、実 HOME へ未セットアップの ECC surface を出さないために `install.sh` は停止します。`profile/ecc-base` は install output を持たないため、local state check の対象外です。
+symlink 作成前の branch-specific install check は、active profile の `checks.d/*.sh` から file name の glob 順で読み込みます。この profile では `profiles/ecc/checks.d/10-local-state.sh` が担当します。`profile/ecc/*` branch では、Claude 側は `~/dotfiles/.claude/ecc/install-state.json` がこの checkout の `.claude` を target にしていること、Codex 側は `~/dotfiles/.codex/dotfiles-profile-ecc-sync-state.json` がこの checkout の local marker であることを確認します。clean clone や別環境で pull した直後にこれらがない、または別 checkout を指している場合、実 HOME へ未セットアップの ECC surface を出さないために `install.sh` は停止します。`profile/ecc-base` は install output を持たないため、local state check の対象外です。
 
 実 HOME に反映する前に、まず verification script を実行します。`test-all.sh` は共通 installer の regression test と、現在の branch に対応する profile smoke test をまとめて実行します。installer regression test は `/tmp` に一時的な dotfiles checkout と HOME fixture を作って検証します。profile smoke test は現在の dotfiles checkout を source として、`/tmp` に作った HOME fixture へ適用します。どちらも実 HOME は変更しません。
 

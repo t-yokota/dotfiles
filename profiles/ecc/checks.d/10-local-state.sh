@@ -26,22 +26,65 @@ check_required_file() {
     fi
 }
 
-check_file_contains_fixed() {
+check_json_string_equals() {
     local path="$1"
-    local text="$2"
-    local label="$3"
+    local field="$2"
+    local expected="$3"
+    local label="$4"
 
-    if ! grep -Fq "$text" "$path"; then
-        echo "Error: $label not found in $path" >&2
+    if ! command -v node >/dev/null 2>&1; then
+        echo "Error: node is required to validate $label: $path" >&2
+        return 1
+    fi
+
+    if ! node - "$path" "$field" "$expected" "$label" <<'NODE'
+const fs = require("fs");
+
+const [file, field, expected, label] = process.argv.slice(2);
+let data;
+
+try {
+  data = JSON.parse(fs.readFileSync(file, "utf8"));
+} catch (error) {
+  console.error(`Error: invalid JSON for ${label}: ${file}: ${error.message}`);
+  process.exit(1);
+}
+
+const actual = field.split(".").reduce((value, key) => {
+  if (value && Object.prototype.hasOwnProperty.call(value, key)) {
+    return value[key];
+  }
+  return undefined;
+}, data);
+
+if (actual !== expected) {
+  console.error(
+    `Error: ${label} mismatch in ${file}: expected ${field}=${JSON.stringify(expected)}, got ${JSON.stringify(actual)}`
+  );
+  process.exit(1);
+}
+NODE
+    then
         return 1
     fi
 }
 
 check_ecc_claude_state() {
     local rc=0
+    local state_file="$DOTPATH/.claude/ecc/install-state.json"
 
-    check_required_file "$DOTPATH/.claude/ecc/install-state.json" \
-        "Claude ECC install-state" || rc=1
+    check_required_file "$state_file" "Claude ECC install-state" || rc=1
+
+    if [ -f "$state_file" ]; then
+        check_json_string_equals "$state_file" "schemaVersion" "ecc.install.v1" \
+            "Claude ECC install-state schema" || rc=1
+        check_json_string_equals "$state_file" "target.id" "claude-home" \
+            "Claude ECC install-state target id" || rc=1
+        check_json_string_equals "$state_file" "target.root" "$DOTPATH/.claude" \
+            "Claude ECC install-state target root" || rc=1
+        check_json_string_equals "$state_file" "target.installStatePath" "$state_file" \
+            "Claude ECC install-state path" || rc=1
+    fi
 
     if [ "$rc" -ne 0 ]; then
         echo "Run this from the ECC repo before install.sh:" >&2
@@ -59,11 +102,9 @@ check_ecc_codex_state() {
     check_required_file "$state_file" "Codex ECC local sync marker" || rc=1
 
     if [ -f "$state_file" ]; then
-        check_file_contains_fixed "$state_file" \
-            '"state_owner": "dotfiles.profile-ecc.codex-sync"' \
+        check_json_string_equals "$state_file" "state_owner" "dotfiles.profile-ecc.codex-sync" \
             "Codex ECC sync marker owner" || rc=1
-        check_file_contains_fixed "$state_file" \
-            "\"dotpath\": \"$DOTPATH\"" \
+        check_json_string_equals "$state_file" "dotpath" "$DOTPATH" \
             "Codex ECC sync marker dotpath" || rc=1
     fi
 
