@@ -143,9 +143,12 @@ bash profiles/ecc/bin/test-profile.sh
 .git
 .gitignore
 .gitconfig.local
+.claude
+.codex
+.agents
 ```
 
-`.gitconfig.local` は環境ごとの machine-local 設定です。tracked な `.gitconfig` から include しますが、`install.sh` では作成も symlink もしません。<br>profile manifest が managed surface として宣言した top-level root、たとえば `.claude`, `.codex`, `.agents` なども、その profile が有効な間は top-level symlink 対象から外します。
+`.gitconfig.local` は環境ごとの machine-local 設定です。tracked な `.gitconfig` から include しますが、`install.sh` では作成も symlink もしません。<br>`.claude`, `.codex`, `.agents` は tool runtime root として扱い、profile が有効な場合だけ managed surface 定義に従って entry 単位または package 単位で symlink します。profile がない branch でも、root directory ごと HOME に symlink することはありません。
 
 ## Managed Dotfile Surfaces
 

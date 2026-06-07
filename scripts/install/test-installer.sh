@@ -309,6 +309,29 @@ test_shell_theme_conflict_fails() {
     assert_absent "$home/.zshrc" || return 1
 }
 
+test_tool_roots_are_not_top_level_links_without_profile() {
+    local fixture="$TEST_ROOT/tool-root-skip-fixture"
+    local home="$TEST_ROOT/tool-root-skip-home"
+    local output="$TEST_ROOT/tool-root-skip-output.log"
+
+    setup_fixture "$fixture" "$home" || return 1
+    write_file "$fixture/.zshrc" "zsh" || return 1
+    write_file "$fixture/.claude/CLAUDE.md" "claude" || return 1
+    write_file "$fixture/.codex/config.toml" "codex" || return 1
+    write_file "$fixture/.agents/skills/example/SKILL.md" "skill" || return 1
+    mkdir -p "$home/.claude" "$home/.codex" "$home/.agents" || return 1
+
+    run_install "$fixture" "$home" "main" "$output" || return 1
+
+    assert_symlink_target "$home/.zshrc" "$fixture/.zshrc" || return 1
+    assert_regular_dir "$home/.claude" || return 1
+    assert_regular_dir "$home/.codex" || return 1
+    assert_regular_dir "$home/.agents" || return 1
+    assert_absent "$home/.claude/CLAUDE.md" || return 1
+    assert_absent "$home/.codex/config.toml" || return 1
+    assert_absent "$home/.agents/skills" || return 1
+}
+
 test_check_ordering() {
     local fixture="$TEST_ROOT/check-fixture"
     local home="$TEST_ROOT/check-home"
@@ -613,6 +636,7 @@ run_test "base profile entry links" test_base_profile_entry_links
 run_test "whole surfaces and child entries" test_whole_surfaces_and_child_entries
 run_test "shell theme links" test_shell_theme_links
 run_test "shell theme conflict fails" test_shell_theme_conflict_fails
+run_test "tool roots are not top-level links without profile" test_tool_roots_are_not_top_level_links_without_profile
 run_test "check ordering by file name" test_check_ordering
 run_test "profile smoke runner" test_profile_smoke_runner
 run_test "profile smoke runner rejects invalid profile manifest" test_profile_smoke_runner_rejects_invalid_profile_manifest
