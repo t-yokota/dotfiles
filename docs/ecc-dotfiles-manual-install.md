@@ -1,6 +1,6 @@
 # ECC Dotfiles Manual Install Procedure
 
-- Last reviewed: 2026-05-30
+- Last reviewed: 2026-06-07
 - ECC version: 2.0.0-rc.1
 
 この手順書では、dotfiles の `profile/ecc-base` branch から環境ごとの `profile/ecc/*` branch を切り、自環境に対して Everything Claude Code (ECC) の manual install を実施する方法を説明します。
@@ -383,14 +383,23 @@ ECC の実体を dotfiles 側に受けたあと、実 HOME へは dotfiles の `
 
 symlink 作成前の branch-specific install check は、active profile の `checks.d/*.sh` から file name の glob 順で読み込みます。この profile では `profiles/ecc/checks.d/10-local-state.sh` が担当します。`profile/ecc/*` branch では、Claude 側は `~/dotfiles/.claude/ecc/install-state.json`、Codex 側は `~/dotfiles/.codex/dotfiles-profile-ecc-sync-state.json` を確認します。clean clone や別環境で pull した直後にこれらがない場合、実 HOME へ未セットアップの ECC surface を出さないために `install.sh` は停止します。`profile/ecc-base` は install output を持たないため、local state check の対象外です。
 
-実 HOME に反映する前に、まず profile 自体を一時 HOME に適用できるか確認します。`test-profile.sh` は `/tmp` に作った HOME fixture へ `install.sh` を実行するため、実 HOME は変更しません。ここでは dotfiles 側の ECC output、profile manifest、branch-specific check が揃っているかを確認します。
+実 HOME に反映する前に、まず verification script を実行します。`test-all.sh` は共通 installer の regression test と、現在の branch に対応する profile smoke test をまとめて実行します。installer regression test は `/tmp` に一時的な dotfiles checkout と HOME fixture を作って検証します。profile smoke test は現在の dotfiles checkout を source として、`/tmp` に作った HOME fixture へ適用します。どちらも実 HOME は変更しません。
+
+`profile/ecc/*` branch では、profile smoke test の中で dotfiles 側の ECC output、profile manifest、branch-specific check が揃っているかを確認します。`profile/ecc-base` では install output を持たないため、local state check は skip されます。
+
+```bash
+cd ~/dotfiles
+bash scripts/install/test-all.sh
+```
+
+profile smoke test だけを切り分けたい場合は、profile 側の wrapper を直接実行します。
 
 ```bash
 cd ~/dotfiles
 bash profiles/ecc/bin/test-profile.sh
 ```
 
-その後、実 HOME に対する conflict や作成予定 symlink を `--dry-run` で確認します。`test-profile.sh` は実 HOME の既存ファイルとの衝突を見ないため、実適用前には `install.sh --dry-run` も実行します。
+その後、実 HOME に対する conflict や作成予定 symlink を `--dry-run` で確認します。verification script は実 HOME の既存ファイルとの衝突を見ないため、実適用前には `install.sh --dry-run` も実行します。
 
 ```bash
 cd ~/dotfiles
