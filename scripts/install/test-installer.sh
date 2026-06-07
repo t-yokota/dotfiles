@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 if [ -z "${BASH_VERSION:-}" ]; then
-    echo "Error: test-install.sh must be run with bash. Use: bash scripts/install/test-install.sh" >&2
+    echo "Error: test-installer.sh must be run with bash. Use: bash scripts/install/test-installer.sh" >&2
     exit 1
 fi
 
@@ -18,7 +18,7 @@ FAIL_COUNT=0
 
 usage() {
     cat <<'USAGE'
-Usage: bash scripts/install/test-install.sh [--verbose|-v]
+Usage: bash scripts/install/test-installer.sh [--verbose|-v]
 
 Options:
   -v, --verbose   Print captured install.sh logs for each fixture.

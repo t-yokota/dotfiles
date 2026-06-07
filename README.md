@@ -35,7 +35,8 @@ profile/<name>/<environment>
 │       │   ├── common.sh
 │       │   ├── profile.sh
 │       │   └── reconcile.sh
-│       ├── test-install.sh
+│       ├── test-all.sh
+│       ├── test-installer.sh
 │       └── test-profile.sh
 ├── profiles/
 │   └── <name>/
@@ -55,7 +56,8 @@ profile/<name>/<environment>
 - `scripts/install/lib/common.sh`: 共通 helper です。log 出力、dry-run 判定、branch 取得、path 解決など、profile policy を持たない処理を置きます。
 - `scripts/install/lib/profile.sh`: profile manifest loader です。現在の branch に合う profile を選び、`profile.tsv`, `surfaces.tsv`, `skipsets.tsv` を検証して installer state に読み込み、profile 固有 check を実行します。
 - `scripts/install/lib/reconcile.sh`: desired state と HOME の actual state を突き合わせる engine です。未管理 path の conflict check、dotfiles 管理 symlink の cleanup、top-level dotfile / managed surface / shell theme の symlink 作成を担当します。
-- `scripts/install/test-install.sh`: installer の regression test です。`/tmp` に一時的な dotfiles checkout と HOME を作り、実 HOME を触らずに install / dry-run / conflict / cleanup / manifest validation を確認します。
+- `scripts/install/test-all.sh`: 一括 verification runner です。installer regression test と、現在の branch に対応する profile smoke test をまとめて実行します。
+- `scripts/install/test-installer.sh`: installer の regression test です。`/tmp` に一時的な dotfiles checkout と HOME を作り、実 HOME を触らずに install / dry-run / conflict / cleanup / manifest validation を確認します。
 - `scripts/install/test-profile.sh`: profile smoke test の共通 runner です。指定した `profiles/<name>/` を一時 HOME に適用し、profile manifest と surface の基本動作を確認します。
 - `profiles/<name>/`: profile branch 固有の定義です。surface、skipset、branch-specific check、profile 補助 script、profile-local smoke test wrapper をここに置きます。
 - `.claude/`, `.codex/`, `.agents/`: profile が HOME に出す tool 用 desired state です。root directory ごと symlink するのではなく、profile manifest の surface 定義に従って扱います。
@@ -77,19 +79,40 @@ bash install.sh --dry-run
 bash install.sh --help
 ```
 
-installer の動作確認には、実際の `~/dotfiles` や `$HOME` を変更しない test script を使えます。<br>この script は `/tmp` に一時的な dotfiles checkout と HOME directory を作り、symlink 作成、conflict 検出、stale symlink cleanup、profile check の実行順を検証します。
+installer と active profile の動作確認には、実際の `~/dotfiles` や `$HOME` を変更しない verification script を使えます。`test-all.sh` は複数の verification script をまとめて実行するための runner で、必要に応じて各 script を個別に実行することもできます。
+
+- `scripts/install/test-all.sh` は複数の verification script をまとめて実行する runner です。installer regression test を実行したあと、現在の branch に対応する profile smoke test があれば続けて実行します。
+- `scripts/install/test-installer.sh` は共通 installer だけの regression test です。profile branch 固有の期待値ではなく、`install.sh` 自体の安全な動作を確認します。
+- `scripts/install/test-profile.sh` は profile smoke test の共通 runner です。直接使うのではなく、通常は `profiles/<name>/bin/test-profile.sh` から呼び出されます。
+- `profiles/<name>/bin/test-profile.sh` は profile 側の wrapper です。profile ごとの branch pattern や fixture を持つため、別 profile を作る場合は profile 資産として移植します。
+
+複数の確認をまとめて行う場合は、`test-all.sh` を実行します。
 
 ```bash
-bash scripts/install/test-install.sh
+bash scripts/install/test-all.sh
 ```
 
-`test-install.sh` の詳細ログを確認したい場合は、`--verbose` を付けます。内部で実行した `install.sh` の出力も表示されます。
+`test-all.sh` の主な option は次の通りです。
+
+- `--verbose` / `-v`: 子 script の詳細ログを表示します。
+- `--branch <branch>`: 指定した branch として active profile を検出します。
+- `--profile profiles/<name>`: active profile 検出の代わりに、指定した profile smoke test を実行します。複数指定できます。
+
+たとえば `bash scripts/install/test-all.sh --branch main` は、`main` に対応する active profile がなければ `test-installer.sh` とほぼ同じ確認になります。将来 `main` に紐づく profile が追加された場合は、その profile smoke test も実行対象になります。
+
+共通 installer だけを確認したい場合は、次の regression test を使います。<br>この script は `/tmp` に一時的な dotfiles checkout と HOME directory を作り、symlink 作成、conflict 検出、stale symlink cleanup、profile check の実行順を検証します。
 
 ```bash
-bash scripts/install/test-install.sh --verbose
+bash scripts/install/test-installer.sh
 ```
 
-profile branch 側に `profiles/<name>/bin/test-profile.sh` がある場合は、その profile 自体が一時 HOME に適用できるかを確認できます。たとえば ECC profile では次のように実行します。
+`test-installer.sh` の詳細ログを確認したい場合は、`--verbose` を付けます。内部で実行した `install.sh` の出力も表示されます。
+
+```bash
+bash scripts/install/test-installer.sh --verbose
+```
+
+profile smoke test だけを確認する場合は、profile 側の wrapper を実行します。たとえば ECC profile では、その profile 自体が一時 HOME に適用できるかを次のコマンドで確認できます。
 
 ```bash
 bash profiles/ecc/bin/test-profile.sh
