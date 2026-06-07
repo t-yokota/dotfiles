@@ -478,6 +478,48 @@ test_stale_managed_symlink_cleanup() {
     assert_symlink_target "$home/.tool/items/current.txt" "$fixture/.tool/items/current.txt" || return 1
 }
 
+test_inactive_profile_tool_root_cleanup() {
+    local fixture="$TEST_ROOT/inactive-profile-fixture"
+    local home="$TEST_ROOT/inactive-profile-home"
+    local profile_output="$TEST_ROOT/inactive-profile-profile-output.log"
+    local main_output="$TEST_ROOT/inactive-profile-main-output.log"
+
+    setup_fixture "$fixture" "$home" || return 1
+    write_file "$fixture/profiles/test/skipsets.tsv" \
+"# kind	name	pattern
+skipset	claude-root	agents" || return 1
+    write_file "$fixture/profiles/test/surfaces.tsv" \
+"# kind	strategy	source	dest	skipset	label
+surface	entries	.claude	.claude	claude-root	Claude root
+surface	entries	.claude/agents	.claude/agents	none	Claude agents" || return 1
+    write_file "$fixture/.claude/AGENTS.md" "managed agents" || return 1
+    write_file "$fixture/.claude/CLAUDE.md" "base memory" || return 1
+    write_file "$fixture/.claude/settings.json" "{}" || return 1
+    write_file "$fixture/.claude/agents/reviewer.md" "managed reviewer" || return 1
+    write_file "$home/.claude/.credentials.json" "local credential" || return 1
+
+    run_install "$fixture" "$home" "$TEST_BRANCH" "$profile_output" || return 1
+
+    assert_symlink_target "$home/.claude/AGENTS.md" "$fixture/.claude/AGENTS.md" || return 1
+    assert_symlink_target "$home/.claude/CLAUDE.md" "$fixture/.claude/CLAUDE.md" || return 1
+    assert_symlink_target "$home/.claude/settings.json" "$fixture/.claude/settings.json" || return 1
+    assert_regular_dir "$home/.claude/agents" || return 1
+    assert_symlink_target "$home/.claude/agents/reviewer.md" "$fixture/.claude/agents/reviewer.md" || return 1
+    assert_file_equals "$home/.claude/.credentials.json" "local credential" || return 1
+
+    rm "$fixture/.claude/AGENTS.md" "$fixture/.claude/agents/reviewer.md" || return 1
+    run_install "$fixture" "$home" "main" "$main_output" || return 1
+
+    assert_absent "$home/.claude/AGENTS.md" || return 1
+    assert_symlink_target "$home/.claude/CLAUDE.md" "$fixture/.claude/CLAUDE.md" || return 1
+    assert_symlink_target "$home/.claude/settings.json" "$fixture/.claude/settings.json" || return 1
+    assert_absent "$home/.claude/agents/reviewer.md" || return 1
+    assert_regular_dir "$home/.claude" || return 1
+    assert_regular_dir "$home/.claude/agents" || return 1
+    assert_file_equals "$home/.claude/.credentials.json" "local credential" || return 1
+    assert_file_contains "$main_output" "Remove stale symlink" || return 1
+}
+
 test_invalid_manifest_fails() {
     local fixture="$TEST_ROOT/invalid-manifest-fixture"
     local home="$TEST_ROOT/invalid-manifest-home"
@@ -644,6 +686,7 @@ run_test "aggregate runner runs active profile" test_aggregate_runner_runs_activ
 run_test "aggregate runner rejects invalid profile manifest" test_aggregate_runner_rejects_invalid_profile_manifest
 run_test "unmanaged entry conflict" test_unmanaged_entry_conflict
 run_test "stale managed symlink cleanup" test_stale_managed_symlink_cleanup
+run_test "inactive profile tool-root cleanup" test_inactive_profile_tool_root_cleanup
 run_test "invalid manifest fails" test_invalid_manifest_fails
 run_test "duplicate profile manifest kind fails" test_duplicate_profile_manifest_kind_fails
 run_test "invalid surface path fails" test_invalid_surface_path_fails
