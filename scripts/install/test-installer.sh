@@ -83,6 +83,21 @@ copy_installer_files() {
     cp "$REPO_ROOT/scripts/install/test-profile.sh" "$fixture/scripts/install/test-profile.sh" || return 1
 }
 
+copy_test_all_runner_files() {
+    local fixture="$1"
+
+    mkdir -p "$fixture/scripts/install/lib" "$fixture/profiles/test/bin" || return 1
+    cp "$REPO_ROOT/scripts/install/lib/common.sh" "$fixture/scripts/install/lib/common.sh" || return 1
+    cp "$REPO_ROOT/scripts/install/lib/profile.sh" "$fixture/scripts/install/lib/profile.sh" || return 1
+    cp "$REPO_ROOT/scripts/install/test-all.sh" "$fixture/scripts/install/test-all.sh" || return 1
+    write_file "$fixture/scripts/install/test-installer.sh" \
+'#!/usr/bin/env bash
+printf "fake installer\n"' || return 1
+    write_file "$fixture/profiles/test/bin/test-profile.sh" \
+'#!/usr/bin/env bash
+printf "fake profile branch=%s\n" "${DOTFILES_BRANCH:-}"' || return 1
+}
+
 write_test_profile() {
     local fixture="$1"
     local profile_dir="$fixture/profiles/test"
@@ -346,6 +361,44 @@ test_profile_smoke_runner() {
     assert_file_contains "$output" "PASS: profile installs into an isolated HOME fixture" || return 1
 }
 
+test_aggregate_runner_runs_active_profile() {
+    local fixture="$TEST_ROOT/aggregate-runner-fixture"
+    local output="$TEST_ROOT/aggregate-runner-output.log"
+
+    copy_test_all_runner_files "$fixture" || return 1
+    write_file "$fixture/profiles/test/profile.tsv" "branch	$TEST_BRANCH" || return 1
+
+    if ! DOTPATH="$fixture" bash "$fixture/scripts/install/test-all.sh" --branch "$TEST_BRANCH" > "$output" 2>&1; then
+        [ "$VERBOSE" -eq 1 ] && show_output "aggregate runner log" "$output"
+        return 1
+    fi
+
+    if [ "$VERBOSE" -eq 1 ]; then
+        show_output "aggregate runner log" "$output"
+    fi
+
+    assert_file_contains "$output" "fake installer" || return 1
+    assert_file_contains "$output" "Run profile smoke test: profiles/test" || return 1
+    assert_file_contains "$output" "fake profile branch=$TEST_BRANCH" || return 1
+    assert_file_contains "$output" "PASS: all checks completed" || return 1
+}
+
+test_aggregate_runner_rejects_invalid_profile_manifest() {
+    local fixture="$TEST_ROOT/aggregate-invalid-manifest-fixture"
+    local output="$TEST_ROOT/aggregate-invalid-manifest-output.log"
+
+    copy_test_all_runner_files "$fixture" || return 1
+    write_file "$fixture/profiles/test/profile.tsv" "branch	$TEST_BRANCH	extra" || return 1
+
+    if DOTPATH="$fixture" bash "$fixture/scripts/install/test-all.sh" --branch "$TEST_BRANCH" > "$output" 2>&1; then
+        log "Aggregate runner unexpectedly succeeded despite invalid profile manifest"
+        return 1
+    fi
+
+    assert_file_contains "$output" "invalid installer manifest" || return 1
+    assert_file_contains "$output" "FAIL: one or more checks failed" || return 1
+}
+
 test_unmanaged_entry_conflict() {
     local fixture="$TEST_ROOT/conflict-fixture"
     local home="$TEST_ROOT/conflict-home"
@@ -540,6 +593,8 @@ run_test "shell theme links" test_shell_theme_links
 run_test "shell theme conflict fails" test_shell_theme_conflict_fails
 run_test "check ordering by file name" test_check_ordering
 run_test "profile smoke runner" test_profile_smoke_runner
+run_test "aggregate runner runs active profile" test_aggregate_runner_runs_active_profile
+run_test "aggregate runner rejects invalid profile manifest" test_aggregate_runner_rejects_invalid_profile_manifest
 run_test "unmanaged entry conflict" test_unmanaged_entry_conflict
 run_test "stale managed symlink cleanup" test_stale_managed_symlink_cleanup
 run_test "invalid manifest fails" test_invalid_manifest_fails

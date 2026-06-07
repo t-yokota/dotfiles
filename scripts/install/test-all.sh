@@ -13,6 +13,16 @@ BRANCH=${DOTFILES_BRANCH:-}
 VERBOSE=0
 PROFILE_INPUTS=()
 
+INSTALL_LIB_DIR="$DOTPATH/scripts/install/lib"
+for lib in common profile; do
+    lib_path="$INSTALL_LIB_DIR/$lib.sh"
+    if [ ! -f "$lib_path" ]; then
+        echo "Error: missing installer library: $lib_path" >&2
+        exit 1
+    fi
+    . "$lib_path"
+done
+
 usage() {
     cat <<'USAGE'
 Usage: bash scripts/install/test-all.sh [--verbose|-v] [--branch <branch>] [--profile profiles/<name>]
@@ -64,38 +74,12 @@ log() {
     printf '[test-all] %s\n' "$*"
 }
 
-line_is_ignored() {
-    case "$1" in
-        ""|\#*) return 0 ;;
-        *) return 1 ;;
-    esac
-}
-
 detect_branch() {
     if [ -n "$BRANCH" ]; then
         return 0
     fi
 
-    BRANCH=$(git -C "$DOTPATH" branch --show-current 2>/dev/null || true)
-}
-
-profile_matches_branch() {
-    local manifest="$1"
-    local branch="$2"
-    local line kind pattern rest
-
-    [ -n "$branch" ] || return 1
-
-    while IFS= read -r line; do
-        line_is_ignored "$line" && continue
-        IFS=$'\t' read -r kind pattern rest <<< "$line"
-        [ "$kind" = "branch" ] || continue
-        if [[ "$branch" == $pattern ]]; then
-            return 0
-        fi
-    done < "$manifest"
-
-    return 1
+    BRANCH=$(cd "$DOTPATH" && get_current_branch)
 }
 
 resolve_profile_dir() {
@@ -112,6 +96,7 @@ resolve_profile_dir() {
 
 discover_active_profiles() {
     local manifest
+    local match_rc
 
     if [ -z "$BRANCH" ]; then
         return 0
@@ -119,9 +104,18 @@ discover_active_profiles() {
 
     for manifest in "$DOTPATH"/profiles/*/profile.tsv; do
         [ -f "$manifest" ] || continue
-        if profile_matches_branch "$manifest" "$BRANCH"; then
-            printf '%s\n' "${manifest%/*}"
-        fi
+        profile_matches_branch "$manifest" "$BRANCH"
+        match_rc=$?
+        case "$match_rc" in
+            0)
+                printf '%s\n' "${manifest%/*}"
+                ;;
+            1)
+                ;;
+            *)
+                return 1
+                ;;
+        esac
     done
 }
 
@@ -156,6 +150,7 @@ run_profile_smoke_test() {
 main() {
     local profile_input profile_dir
     local profile_dirs=()
+    local discovered_profiles
     local rc=0
 
     detect_branch
@@ -178,9 +173,13 @@ main() {
             profile_dirs+=("$profile_dir")
         done
     else
-        while IFS= read -r profile_dir; do
-            [ -n "$profile_dir" ] && profile_dirs+=("$profile_dir")
-        done < <(discover_active_profiles)
+        if discovered_profiles=$(discover_active_profiles); then
+            while IFS= read -r profile_dir; do
+                [ -n "$profile_dir" ] && profile_dirs+=("$profile_dir")
+            done <<< "$discovered_profiles"
+        else
+            rc=1
+        fi
     fi
 
     if [ "${#profile_dirs[@]}" -eq 0 ]; then
