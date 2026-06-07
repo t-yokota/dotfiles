@@ -28,11 +28,12 @@ is_reserved_root_entry() {
     return 1
 }
 
-# Repo-local control files are always private to this checkout. Active profile
-# source roots are reserved dynamically from the loaded surface manifest.
+# Repo-local control files and tool runtime roots are never linked as top-level
+# entries. Active profile source roots are also reserved dynamically from the
+# loaded surface manifest.
 should_skip_root_entry() {
     case "$1" in
-        .git|.gitignore|.gitconfig.local)
+        .git|.gitignore|.gitconfig.local|.claude|.codex|.agents)
             return 0
             ;;
     esac
