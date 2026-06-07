@@ -1,7 +1,8 @@
 # Machine-local Git config included by .gitconfig
 .gitconfig.local
 
-# Claude Code runtime, cache, and credential state
+# Claude Code runtime and installer state
+.claude/ecc/
 .claude/projects/
 .claude/session*
 .claude/history.jsonl
@@ -24,7 +25,11 @@
 .claude/*.sqlite-wal
 .claude/*.sqlite-shm
 
-# Codex runtime, cache, and credential state
+# Codex runtime, credential, backup, and generated hook state
+.codex/ecc-install-state.json
+.codex/dotfiles-*-sync-state.json
+.codex/backups/
+.codex/git-hooks/
 .codex/auth.json
 .codex/sessions/
 .codex/logs/
@@ -45,7 +50,7 @@
 .codex/*.sqlite-wal
 .codex/*.sqlite-shm
 
-# User-level agent runtime, cache, and credential state
+# User-level agent runtime/cache state
 .agents/logs/
 .agents/backups/
 .agents/cache/
