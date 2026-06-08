@@ -104,4 +104,7 @@ link_shell_themes || exit 1
 if is_dry_run; then
     log_section "Dry-run Result"
     log_step "OK: no conflicts detected; no changes were written by the common installer"
+else
+    log_section "Install Result"
+    log_step "OK: install completed; changes were written by the common installer"
 fi

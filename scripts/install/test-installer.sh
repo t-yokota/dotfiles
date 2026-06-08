@@ -256,6 +256,8 @@ test_base_profile_entry_links() {
     assert_absent "$home/.tool/cache" || return 1
     assert_absent "$home/.gitignore" || return 1
     assert_absent "$home/.gitconfig.local" || return 1
+    assert_file_contains "$output" "Install Result" || return 1
+    assert_file_contains "$output" "OK: install completed; changes were written by the common installer" || return 1
 }
 
 test_whole_surfaces_and_child_entries() {

@@ -3,24 +3,101 @@
 # Shared installer utilities with no profile-specific policy: logging, ignored
 # manifest lines, branch lookup, and path normalization helpers.
 
+color_enabled() {
+    if [ -n "${FORCE_COLOR:-}" ] && [ "${FORCE_COLOR:-}" != "0" ]; then
+        return 0
+    fi
+
+    [ -z "${NO_COLOR:-}" ] || return 1
+    [ "${TERM:-}" = "dumb" ] && return 1
+    [ -t 1 ]
+}
+
+color_text() {
+    local color="$1"
+    local text="$2"
+    local reset
+
+    if color_enabled; then
+        reset=$(printf '\033[0m')
+        printf '%b%s%b' "$color" "$text" "$reset"
+    else
+        printf '%s' "$text"
+    fi
+}
+
+color_blue() {
+    color_text "$(printf '\033[34m')" "$1"
+}
+
+color_green() {
+    color_text "$(printf '\033[32m')" "$1"
+}
+
+color_cyan() {
+    color_text "$(printf '\033[36m')" "$1"
+}
+
+color_magenta() {
+    color_text "$(printf '\033[35m')" "$1"
+}
+
+color_yellow() {
+    color_text "$(printf '\033[33m')" "$1"
+}
+
 log_section() {
-    printf '\n== %s ==\n' "$1"
+    printf '\n'
+    color_blue "== $1 =="
+    printf '\n'
 }
 
 log_step() {
-    printf -- '- %s\n' "$1"
+    case "$1" in
+        OK:*)
+            printf -- '- '
+            color_green "$1"
+            printf '\n'
+            ;;
+        Dry-run*|Skip:*)
+            printf -- '- '
+            color_yellow "$1"
+            printf '\n'
+            ;;
+        *)
+            printf -- '- %s\n' "$1"
+            ;;
+    esac
 }
 
 log_substep() {
-    printf '  - %s\n' "$1"
+    case "$1" in
+        Would*|Skip*)
+            printf '    - '
+            color_yellow "$1"
+            printf '\n'
+            ;;
+        Remove*)
+            printf '    - '
+            color_magenta "$1"
+            printf '\n'
+            ;;
+        *)
+            printf '  - %s\n' "$1"
+            ;;
+    esac
 }
 
 log_link() {
-    printf '    - Link: %s -> %s\n' "$1" "$2"
+    printf '    - '
+    color_cyan "Link: $1 -> $2"
+    printf '\n'
 }
 
 log_would_link() {
-    printf '    - Would link: %s -> %s\n' "$1" "$2"
+    printf '    - '
+    color_yellow "Would link: $1 -> $2"
+    printf '\n'
 }
 
 is_dry_run() {
