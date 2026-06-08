@@ -245,3 +245,20 @@ check script は選択中の branch の profile を現在の環境に適用す�
 - cleanup は、この dotfiles checkout を指す symlink だけを削除します。
 - `entries` surface の link 先 directory と `whole` surface の親 directory は、通常 directory である必要があります。未管理 symlink 越しには書き込みません。
 - credential、cache、backup、machine-local config といった local / runtime state は shared commit に含めません。
+
+## Future Work
+
+今後の改善候補は、共通 dotfiles 基盤と profile 固有の改善を分けて扱います。番号は優先度順です。共通 installer の安全性や運用性に関わるものを先に進め、ECC 固有の挙動は別の設計課題として扱います。
+
+### Common Installer
+
+1. `uninstall.sh` を追加し、現在の dotfiles checkout が実 HOME に作った symlink をまとめて外せるようにします。
+2. installer / uninstaller の Result 表示を拡張し、link / skip / cleanup などの件数を確認できるようにします。
+
+### ECC Profile
+
+3. Claude / Codex の適用対象を選択できるようにします。`install.sh` は最低どちらか一方の desired state が準備されていれば適用可能とし、両方必須にはしない方針です。
+
+### Profile Operations
+
+4. 共通 installer や profile の共通部分を、`main` と profile branch 間で同期しやすくする補助を検討します。
