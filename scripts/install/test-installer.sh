@@ -611,6 +611,25 @@ test_uninstall_dry_run_does_not_write() {
     assert_symlink_target "$home/.tool/config.toml" "$fixture/.tool/config.toml" || return 1
 }
 
+test_uninstall_dry_run_deduplicates_tool_root_surface() {
+    local fixture="$TEST_ROOT/uninstall-dedup-fixture"
+    local home="$TEST_ROOT/uninstall-dedup-home"
+    local install_output="$TEST_ROOT/uninstall-dedup-install-output.log"
+    local uninstall_output="$TEST_ROOT/uninstall-dedup-output.log"
+
+    setup_fixture "$fixture" "$home" || return 1
+    write_file "$fixture/profiles/test/surfaces.tsv" \
+"# kind	strategy	source	dest	skipset	label
+surface	entries	.claude	.claude	none	Claude root" || return 1
+    write_file "$fixture/.claude/CLAUDE.md" "claude" || return 1
+
+    run_install "$fixture" "$home" "$TEST_BRANCH" "$install_output" || return 1
+    run_uninstall_args "$fixture" "$home" "$TEST_BRANCH" "$uninstall_output" --dry-run || return 1
+
+    assert_file_contains "$uninstall_output" "Planned removals: 1" || return 1
+    assert_symlink_target "$home/.claude/CLAUDE.md" "$fixture/.claude/CLAUDE.md" || return 1
+}
+
 test_invalid_manifest_fails() {
     local fixture="$TEST_ROOT/invalid-manifest-fixture"
     local home="$TEST_ROOT/invalid-manifest-home"
@@ -783,6 +802,7 @@ run_test "stale managed symlink cleanup" test_stale_managed_symlink_cleanup
 run_test "inactive profile tool-root cleanup" test_inactive_profile_tool_root_cleanup
 run_test "uninstall removes managed symlinks" test_uninstall_removes_managed_symlinks
 run_test "uninstall dry-run does not write" test_uninstall_dry_run_does_not_write
+run_test "uninstall dry-run deduplicates tool-root surface" test_uninstall_dry_run_deduplicates_tool_root_surface
 run_test "invalid manifest fails" test_invalid_manifest_fails
 run_test "duplicate profile manifest kind fails" test_duplicate_profile_manifest_kind_fails
 run_test "invalid surface path fails" test_invalid_surface_path_fails

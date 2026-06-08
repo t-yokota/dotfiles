@@ -8,6 +8,7 @@ INSTALL_SUMMARY_WOULD_LINK=${INSTALL_SUMMARY_WOULD_LINK:-0}
 INSTALL_SUMMARY_REMOVED=${INSTALL_SUMMARY_REMOVED:-0}
 INSTALL_SUMMARY_WOULD_REMOVE=${INSTALL_SUMMARY_WOULD_REMOVE:-0}
 INSTALL_SUMMARY_SKIPPED=${INSTALL_SUMMARY_SKIPPED:-0}
+INSTALL_SUMMARY_REMOVE_PATHS=()
 
 summary_increment() {
     case "$1" in
@@ -17,6 +18,18 @@ summary_increment() {
         would_remove) INSTALL_SUMMARY_WOULD_REMOVE=$((INSTALL_SUMMARY_WOULD_REMOVE + 1)) ;;
         skipped) INSTALL_SUMMARY_SKIPPED=$((INSTALL_SUMMARY_SKIPPED + 1)) ;;
     esac
+}
+
+summary_mark_remove_path() {
+    local path="$1"
+    local entry
+
+    for entry in "${INSTALL_SUMMARY_REMOVE_PATHS[@]}"; do
+        [ "$entry" = "$path" ] && return 1
+    done
+
+    INSTALL_SUMMARY_REMOVE_PATHS+=("$path")
+    return 0
 }
 
 color_enabled() {
