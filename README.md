@@ -262,10 +262,14 @@ check script は選択中の branch の profile を現在の環境に適用す�
 
 今後の改善候補は、共通 dotfiles 基盤と profile 固有の改善を分けて扱います。番号は優先度順です。ECC 固有の挙動と profile 運用の補助は別の設計課題として扱います。
 
+### Common Installer
+
+1. `status.sh` を追加し、現在の HOME にある dotfiles-managed symlink の状態を read-only に一覧できるようにします。linked、missing、stale、unmanaged conflict、skipped / runtime state などを分類して確認できる形を検討します。
+
 ### ECC Profile
 
-1. Claude / Codex の適用対象を選択できるようにします。`install.sh` は最低どちらか一方の desired state が準備されていれば適用可能とし、両方必須にはしない方針です。
+2. Claude / Codex の適用対象を選択できるようにします。`install.sh` は最低どちらか一方の desired state が準備されていれば適用可能とし、両方必須にはしない方針です。
 
 ### Profile Operations
 
-2. 共通 installer や profile の共通部分を、`main` と profile branch 間で同期しやすくする補助を検討します。
+3. 共通 installer や profile の共通部分を、`main` と profile branch 間で同期しやすくする補助を検討します。
