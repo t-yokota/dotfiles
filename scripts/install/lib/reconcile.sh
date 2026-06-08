@@ -201,6 +201,35 @@ cleanup_whole_surface() {
     fi
 }
 
+cleanup_orphaned_tool_root_symlinks() {
+    local root dest_dir dest target
+
+    for root in .claude .codex .agents; do
+        dest_dir="$HOME/$root"
+        [ -e "$dest_dir" ] || [ -L "$dest_dir" ] || continue
+
+        if is_managed_symlink "$dest_dir" "$DOTPATH"; then
+            target=$(readlink "$dest_dir")
+            if [ -e "$target" ] || [ -L "$target" ]; then
+                continue
+            fi
+            remove_managed_path "stale symlink" "$dest_dir"
+            continue
+        fi
+
+        [ -d "$dest_dir" ] || continue
+
+        while IFS= read -r -d '' dest; do
+            is_managed_symlink "$dest" "$DOTPATH" || continue
+            target=$(readlink "$dest")
+            if [ -e "$target" ] || [ -L "$target" ]; then
+                continue
+            fi
+            remove_managed_path "stale symlink" "$dest"
+        done < <(find "$dest_dir" -type l -print0)
+    done
+}
+
 cleanup_root_symlinks() {
     local dest name target
 

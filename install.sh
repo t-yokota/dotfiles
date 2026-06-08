@@ -75,6 +75,8 @@ log_step "Prune stale top-level symlinks"
 cleanup_root_symlinks || exit 1
 log_step "Prune stale managed dotfile surface symlinks"
 cleanup_all_managed_surfaces || exit 1
+log_step "Prune orphaned tool-root symlinks"
+cleanup_orphaned_tool_root_symlinks || exit 1
 
 log_section "Link Conflict Check"
 log_step "Check top-level destination conflicts"
@@ -102,4 +104,7 @@ link_shell_themes || exit 1
 if is_dry_run; then
     log_section "Dry-run Result"
     log_step "OK: no conflicts detected; no changes were written by the common installer"
+else
+    log_section "Install Result"
+    log_step "OK: install completed; changes were written by the common installer"
 fi
