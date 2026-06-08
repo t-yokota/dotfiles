@@ -3,6 +3,22 @@
 # Shared installer utilities with no profile-specific policy: logging, ignored
 # manifest lines, branch lookup, and path normalization helpers.
 
+INSTALL_SUMMARY_LINKED=${INSTALL_SUMMARY_LINKED:-0}
+INSTALL_SUMMARY_WOULD_LINK=${INSTALL_SUMMARY_WOULD_LINK:-0}
+INSTALL_SUMMARY_REMOVED=${INSTALL_SUMMARY_REMOVED:-0}
+INSTALL_SUMMARY_WOULD_REMOVE=${INSTALL_SUMMARY_WOULD_REMOVE:-0}
+INSTALL_SUMMARY_SKIPPED=${INSTALL_SUMMARY_SKIPPED:-0}
+
+summary_increment() {
+    case "$1" in
+        linked) INSTALL_SUMMARY_LINKED=$((INSTALL_SUMMARY_LINKED + 1)) ;;
+        would_link) INSTALL_SUMMARY_WOULD_LINK=$((INSTALL_SUMMARY_WOULD_LINK + 1)) ;;
+        removed) INSTALL_SUMMARY_REMOVED=$((INSTALL_SUMMARY_REMOVED + 1)) ;;
+        would_remove) INSTALL_SUMMARY_WOULD_REMOVE=$((INSTALL_SUMMARY_WOULD_REMOVE + 1)) ;;
+        skipped) INSTALL_SUMMARY_SKIPPED=$((INSTALL_SUMMARY_SKIPPED + 1)) ;;
+    esac
+}
+
 color_enabled() {
     if [ -n "${FORCE_COLOR:-}" ] && [ "${FORCE_COLOR:-}" != "0" ]; then
         return 0
@@ -59,7 +75,13 @@ log_step() {
             color_green "$1"
             printf '\n'
             ;;
-        Dry-run*|Skip:*)
+        Dry-run*)
+            printf -- '- '
+            color_yellow "$1"
+            printf '\n'
+            ;;
+        Skip:*)
+            summary_increment skipped
             printf -- '- '
             color_yellow "$1"
             printf '\n'
@@ -72,7 +94,13 @@ log_step() {
 
 log_substep() {
     case "$1" in
-        Would*|Skip*)
+        Would*)
+            printf '    - '
+            color_yellow "$1"
+            printf '\n'
+            ;;
+        Skip*)
+            summary_increment skipped
             printf '    - '
             color_yellow "$1"
             printf '\n'
@@ -89,15 +117,41 @@ log_substep() {
 }
 
 log_link() {
+    summary_increment linked
     printf '    - '
     color_cyan "Link: $1 -> $2"
     printf '\n'
 }
 
 log_would_link() {
+    summary_increment would_link
     printf '    - '
     color_yellow "Would link: $1 -> $2"
     printf '\n'
+}
+
+log_result_summary() {
+    local mode="${1:-install}"
+
+    case "$mode" in
+        uninstall)
+            if is_dry_run; then
+                log_step "Planned removals: $INSTALL_SUMMARY_WOULD_REMOVE"
+            else
+                log_step "Removals: $INSTALL_SUMMARY_REMOVED"
+            fi
+            ;;
+        *)
+            if is_dry_run; then
+                log_step "Planned links: $INSTALL_SUMMARY_WOULD_LINK"
+                log_step "Planned removals: $INSTALL_SUMMARY_WOULD_REMOVE"
+            else
+                log_step "Links: $INSTALL_SUMMARY_LINKED"
+                log_step "Removals: $INSTALL_SUMMARY_REMOVED"
+            fi
+            log_step "Skips: $INSTALL_SUMMARY_SKIPPED"
+            ;;
+    esac
 }
 
 is_dry_run() {
