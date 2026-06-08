@@ -713,6 +713,8 @@ test_status_verbose_reports_linked_and_skipped() {
 
     assert_file_contains "$output" "linked:" || return 1
     assert_file_contains "$output" "skipped:" || return 1
+    assert_file_contains "$output" "No desired links found for this surface." || return 1
+    assert_file_contains "$output" "OK: no orphaned or stale dotfiles-managed symlinks found." || return 1
 }
 
 test_invalid_manifest_fails() {
