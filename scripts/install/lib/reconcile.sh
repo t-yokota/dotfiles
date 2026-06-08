@@ -364,3 +364,87 @@ link_shell_themes() {
         link_managed_entry "$theme" "$theme_dest" "$DOTPATH" || return 1
     done
 }
+
+uninstall_root_symlinks() {
+    local dest
+
+    [ -d "$HOME" ] || return 0
+
+    for dest in "$HOME"/*; do
+        [ -e "$dest" ] || [ -L "$dest" ] || continue
+        is_managed_symlink "$dest" "$DOTPATH" || continue
+        remove_managed_path "managed symlink" "$dest"
+    done
+}
+
+uninstall_managed_entries() {
+    local source_dir="$1"
+    local dest_dir="$2"
+    local dest
+
+    if is_managed_symlink "$dest_dir" "$source_dir"; then
+        remove_managed_path "managed surface symlink" "$dest_dir"
+        return 0
+    fi
+
+    [ -d "$dest_dir" ] || return 0
+
+    for dest in "$dest_dir"/*; do
+        [ -e "$dest" ] || [ -L "$dest" ] || continue
+        is_managed_symlink "$dest" "$source_dir" || continue
+        remove_managed_path "managed surface symlink" "$dest"
+    done
+}
+
+uninstall_whole_surface() {
+    local source_path="$1"
+    local dest_path="$2"
+
+    is_managed_symlink "$dest_path" "$source_path" || return 0
+    remove_managed_path "managed surface symlink" "$dest_path"
+}
+
+uninstall_all_managed_surfaces() {
+    local surface strategy source_path dest_path skipset label
+
+    for surface in "${MANAGED_SURFACES[@]}"; do
+        IFS=$'\t' read -r strategy source_path dest_path skipset label <<< "$surface"
+        case "$strategy" in
+            entries) uninstall_managed_entries "$source_path" "$dest_path" || return 1 ;;
+            whole) uninstall_whole_surface "$source_path" "$dest_path" || return 1 ;;
+        esac
+    done
+}
+
+uninstall_tool_root_symlinks() {
+    local root dest_dir dest
+
+    for root in .claude .codex .agents; do
+        dest_dir="$HOME/$root"
+        [ -e "$dest_dir" ] || [ -L "$dest_dir" ] || continue
+
+        if is_managed_symlink "$dest_dir" "$DOTPATH"; then
+            remove_managed_path "managed symlink" "$dest_dir"
+            continue
+        fi
+
+        [ -d "$dest_dir" ] || continue
+
+        while IFS= read -r -d '' dest; do
+            is_managed_symlink "$dest" "$DOTPATH" || continue
+            remove_managed_path "managed symlink" "$dest"
+        done < <(find "$dest_dir" -type l -print0)
+    done
+}
+
+uninstall_shell_themes() {
+    local theme_dest
+
+    [ -d "$OH_MY_ZSH_THEMES" ] || return 0
+
+    for theme_dest in "$OH_MY_ZSH_THEMES"/*; do
+        [ -e "$theme_dest" ] || [ -L "$theme_dest" ] || continue
+        is_managed_symlink "$theme_dest" "$DOTPATH" || continue
+        remove_managed_path "managed shell theme symlink" "$theme_dest"
+    done
+}
