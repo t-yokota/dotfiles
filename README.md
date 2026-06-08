@@ -30,12 +30,14 @@ profile/<name>/<environment>
 .
 ├── install.sh
 ├── uninstall.sh
+├── status.sh
 ├── scripts/
 │   └── install/
 │       ├── lib/
 │       │   ├── common.sh
 │       │   ├── profile.sh
-│       │   └── reconcile.sh
+│       │   ├── reconcile.sh
+│       │   └── status.sh
 │       ├── test-all.sh
 │       ├── test-installer.sh
 │       └── test-profile.sh
@@ -55,9 +57,11 @@ profile/<name>/<environment>
 
 - `install.sh`: 共通 installer の entrypoint です。CLI option、`DOTPATH` / `HOME` の初期化、library 読み込み、install phase の実行順だけを持ちます。
 - `uninstall.sh`: 共通 uninstaller の entrypoint です。現在の dotfiles checkout が実 HOME に作った symlink だけを外します。通常ファイル、別 checkout への symlink、runtime state は削除しません。
+- `status.sh`: 共通 status reporter の entrypoint です。現在の HOME にある dotfiles-managed symlink と active profile の desired state を read-only に照合します。
 - `scripts/install/lib/common.sh`: 共通 helper です。log 出力、dry-run 判定、branch 取得、path 解決など、profile policy を持たない処理を置きます。
 - `scripts/install/lib/profile.sh`: profile manifest loader です。現在の branch に合う profile を選び、`profile.tsv`, `surfaces.tsv`, `skipsets.tsv` を検証して installer state に読み込み、profile 固有 check を実行します。
 - `scripts/install/lib/reconcile.sh`: desired state と HOME の actual state を突き合わせる engine です。未管理 path の conflict check、dotfiles 管理 symlink の cleanup、top-level dotfile / managed surface / shell theme の symlink 作成を担当します。
+- `scripts/install/lib/status.sh`: link status reporter です。active profile の desired state と HOME の symlink 状態を照合し、linked / missing / conflict / stale / orphaned / skipped に分類します。
 - `scripts/install/test-all.sh`: 一括 verification runner です。installer regression test と、現在の branch に対応する profile smoke test をまとめて実行します。
 - `scripts/install/test-installer.sh`: installer の regression test です。`/tmp` に一時的な dotfiles checkout と HOME を作り、実 HOME を触らずに install / dry-run / conflict / cleanup / manifest validation を確認します。
 - `scripts/install/test-profile.sh`: profile smoke test の共通 runner です。指定した `profiles/<name>/` を一時 HOME に適用し、profile manifest と surface の基本動作を確認します。
@@ -89,6 +93,13 @@ bash uninstall.sh
 ```
 
 `install.sh` / `uninstall.sh` の Result には、link / removal / skip などの件数が表示されます。
+
+現在の link 状況を確認したい場合は、`status.sh` を使います。`status.sh` は read-only で、実 HOME へ書き込みません。通常表示では missing / conflict / stale / orphaned などの確認が必要な状態を表示し、`--verbose` を付けると linked / skipped も含めて表示します。
+
+```bash
+bash status.sh
+bash status.sh --verbose
+```
 
 installer と active profile の動作確認には、実際の `~/dotfiles` や `$HOME` を変更しない verification script を使えます。`test-all.sh` は複数の verification script をまとめて実行するための runner で、必要に応じて各 script を個別に実行することもできます。
 
@@ -262,14 +273,10 @@ check script は選択中の branch の profile を現在の環境に適用す�
 
 今後の改善候補は、共通 dotfiles 基盤と profile 固有の改善を分けて扱います。番号は優先度順です。ECC 固有の挙動と profile 運用の補助は別の設計課題として扱います。
 
-### Common Installer
-
-1. `status.sh` を追加し、現在の HOME にある dotfiles-managed symlink の状態を read-only に一覧できるようにします。linked、missing、stale、unmanaged conflict、skipped / runtime state などを分類して確認できる形を検討します。
-
 ### ECC Profile
 
-2. Claude / Codex の適用対象を選択できるようにします。`install.sh` は最低どちらか一方の desired state が準備されていれば適用可能とし、両方必須にはしない方針です。
+1. Claude / Codex の適用対象を選択できるようにします。`install.sh` は最低どちらか一方の desired state が準備されていれば適用可能とし、両方必須にはしない方針です。
 
 ### Profile Operations
 
-3. 共通 installer や profile の共通部分を、`main` と profile branch 間で同期しやすくする補助を検討します。
+2. 共通 installer や profile の共通部分を、`main` と profile branch 間で同期しやすくする補助を検討します。

@@ -79,6 +79,7 @@ copy_installer_files() {
 
     cp "$REPO_ROOT/install.sh" "$fixture/install.sh" || return 1
     cp "$REPO_ROOT/uninstall.sh" "$fixture/uninstall.sh" || return 1
+    cp "$REPO_ROOT/status.sh" "$fixture/status.sh" || return 1
     mkdir -p "$fixture/scripts/install" || return 1
     cp -R "$REPO_ROOT/scripts/install/lib" "$fixture/scripts/install/lib" || return 1
     cp "$REPO_ROOT/scripts/install/test-profile.sh" "$fixture/scripts/install/test-profile.sh" || return 1
@@ -197,6 +198,37 @@ run_uninstall_args() {
 
     if [ "$VERBOSE" -eq 1 ]; then
         show_output "$branch uninstall log" "$output"
+    fi
+
+    return "$rc"
+}
+
+run_status() {
+    local fixture="$1"
+    local home="$2"
+    local branch="$3"
+    local output="$4"
+
+    run_status_args "$fixture" "$home" "$branch" "$output"
+}
+
+run_status_args() {
+    local fixture="$1"
+    local home="$2"
+    local branch="$3"
+    local output="$4"
+    local rc
+    shift 4
+
+    HOME="$home" \
+    DOTPATH="$fixture" \
+    DOTFILES_BRANCH="$branch" \
+    OH_MY_ZSH_THEMES="$home/.oh-my-zsh/themes" \
+        bash "$fixture/status.sh" "$@" > "$output" 2>&1
+    rc=$?
+
+    if [ "$VERBOSE" -eq 1 ]; then
+        show_output "$branch status log" "$output"
     fi
 
     return "$rc"
@@ -630,6 +662,59 @@ surface	entries	.claude	.claude	none	Claude root" || return 1
     assert_symlink_target "$home/.claude/CLAUDE.md" "$fixture/.claude/CLAUDE.md" || return 1
 }
 
+test_status_reports_link_inventory() {
+    local fixture="$TEST_ROOT/status-fixture"
+    local home="$TEST_ROOT/status-home"
+    local output="$TEST_ROOT/status-output.log"
+
+    setup_fixture "$fixture" "$home" || return 1
+    mkdir -p "$home/.tool/items" "$home/.oh-my-zsh/themes" || return 1
+    write_file "$fixture/.zshrc" "zsh" || return 1
+    write_file "$fixture/.gitconfig" "gitconfig" || return 1
+    write_file "$fixture/.tool/config.toml" "config" || return 1
+    write_file "$fixture/.tool/items/example.txt" "item" || return 1
+    write_file "$fixture/.tool/cache/session.json" "cache" || return 1
+    write_file "$fixture/.tool/package/manifest.json" "{}" || return 1
+    write_file "$fixture/my.zsh-theme" "theme" || return 1
+
+    ln -s "$fixture/.zshrc" "$home/.zshrc" || return 1
+    write_file "$home/.tool/items/example.txt" "local conflict" || return 1
+    ln -s "$fixture/.tool/removed.txt" "$home/.tool/removed.txt" || return 1
+    ln -s "$fixture/.tool/cache" "$home/.tool/cache" || return 1
+
+    run_status "$fixture" "$home" "$TEST_BRANCH" "$output" || return 1
+
+    assert_file_contains "$output" "Status Result" || return 1
+    assert_file_contains "$output" "Linked:" || return 1
+    assert_file_contains "$output" "Missing:" || return 1
+    assert_file_contains "$output" "Conflicts:" || return 1
+    assert_file_contains "$output" "Stale:" || return 1
+    assert_file_contains "$output" "Orphaned:" || return 1
+    assert_file_contains "$output" "Skipped:" || return 1
+    assert_file_contains "$output" "missing:" || return 1
+    assert_file_contains "$output" "conflict:" || return 1
+    assert_file_contains "$output" "stale:" || return 1
+    assert_file_contains "$output" "orphaned:" || return 1
+    assert_symlink_target "$home/.zshrc" "$fixture/.zshrc" || return 1
+    assert_symlink_target "$home/.tool/removed.txt" "$fixture/.tool/removed.txt" || return 1
+}
+
+test_status_verbose_reports_linked_and_skipped() {
+    local fixture="$TEST_ROOT/status-verbose-fixture"
+    local home="$TEST_ROOT/status-verbose-home"
+    local output="$TEST_ROOT/status-verbose-output.log"
+
+    setup_fixture "$fixture" "$home" || return 1
+    write_file "$fixture/.zshrc" "zsh" || return 1
+    write_file "$fixture/.tool/cache/session.json" "cache" || return 1
+    ln -s "$fixture/.zshrc" "$home/.zshrc" || return 1
+
+    run_status_args "$fixture" "$home" "$TEST_BRANCH" "$output" --verbose || return 1
+
+    assert_file_contains "$output" "linked:" || return 1
+    assert_file_contains "$output" "skipped:" || return 1
+}
+
 test_invalid_manifest_fails() {
     local fixture="$TEST_ROOT/invalid-manifest-fixture"
     local home="$TEST_ROOT/invalid-manifest-home"
@@ -803,6 +888,8 @@ run_test "inactive profile tool-root cleanup" test_inactive_profile_tool_root_cl
 run_test "uninstall removes managed symlinks" test_uninstall_removes_managed_symlinks
 run_test "uninstall dry-run does not write" test_uninstall_dry_run_does_not_write
 run_test "uninstall dry-run deduplicates tool-root surface" test_uninstall_dry_run_deduplicates_tool_root_surface
+run_test "status reports link inventory" test_status_reports_link_inventory
+run_test "status verbose reports linked and skipped" test_status_verbose_reports_linked_and_skipped
 run_test "invalid manifest fails" test_invalid_manifest_fails
 run_test "duplicate profile manifest kind fails" test_duplicate_profile_manifest_kind_fails
 run_test "invalid surface path fails" test_invalid_surface_path_fails
