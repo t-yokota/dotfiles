@@ -78,6 +78,7 @@ copy_installer_files() {
     local fixture="$1"
 
     cp "$REPO_ROOT/install.sh" "$fixture/install.sh" || return 1
+    cp "$REPO_ROOT/uninstall.sh" "$fixture/uninstall.sh" || return 1
     mkdir -p "$fixture/scripts/install" || return 1
     cp -R "$REPO_ROOT/scripts/install/lib" "$fixture/scripts/install/lib" || return 1
     cp "$REPO_ROOT/scripts/install/test-profile.sh" "$fixture/scripts/install/test-profile.sh" || return 1
@@ -170,6 +171,37 @@ run_install_args() {
     return "$rc"
 }
 
+run_uninstall() {
+    local fixture="$1"
+    local home="$2"
+    local branch="$3"
+    local output="$4"
+
+    run_uninstall_args "$fixture" "$home" "$branch" "$output"
+}
+
+run_uninstall_args() {
+    local fixture="$1"
+    local home="$2"
+    local branch="$3"
+    local output="$4"
+    local rc
+    shift 4
+
+    HOME="$home" \
+    DOTPATH="$fixture" \
+    DOTFILES_BRANCH="$branch" \
+    OH_MY_ZSH_THEMES="$home/.oh-my-zsh/themes" \
+        bash "$fixture/uninstall.sh" "$@" > "$output" 2>&1
+    rc=$?
+
+    if [ "$VERBOSE" -eq 1 ]; then
+        show_output "$branch uninstall log" "$output"
+    fi
+
+    return "$rc"
+}
+
 assert_symlink_target() {
     local path="$1"
     local expected="$2"
@@ -257,6 +289,9 @@ test_base_profile_entry_links() {
     assert_absent "$home/.gitignore" || return 1
     assert_absent "$home/.gitconfig.local" || return 1
     assert_file_contains "$output" "Install Result" || return 1
+    assert_file_contains "$output" "Links:" || return 1
+    assert_file_contains "$output" "Removals:" || return 1
+    assert_file_contains "$output" "Skips:" || return 1
     assert_file_contains "$output" "OK: install completed; changes were written by the common installer" || return 1
 }
 
@@ -522,6 +557,60 @@ surface	entries	.claude/agents	.claude/agents	none	Claude agents" || return 1
     assert_file_contains "$main_output" "Remove stale symlink" || return 1
 }
 
+test_uninstall_removes_managed_symlinks() {
+    local fixture="$TEST_ROOT/uninstall-fixture"
+    local home="$TEST_ROOT/uninstall-home"
+    local install_output="$TEST_ROOT/uninstall-install-output.log"
+    local uninstall_output="$TEST_ROOT/uninstall-output.log"
+
+    setup_fixture "$fixture" "$home" || return 1
+    mkdir -p "$home/.oh-my-zsh/themes" || return 1
+    write_file "$fixture/.zshrc" "zsh" || return 1
+    write_file "$fixture/.gitconfig" "gitconfig" || return 1
+    write_file "$fixture/.tool/config.toml" "config" || return 1
+    write_file "$fixture/.tool/items/example.txt" "item" || return 1
+    write_file "$fixture/.tool/package/manifest.json" "{}" || return 1
+    write_file "$fixture/my.zsh-theme" "theme" || return 1
+    write_file "$home/.tool/local.txt" "local" || return 1
+
+    run_install "$fixture" "$home" "$TEST_BRANCH" "$install_output" || return 1
+    run_uninstall "$fixture" "$home" "$TEST_BRANCH" "$uninstall_output" || return 1
+
+    assert_absent "$home/.zshrc" || return 1
+    assert_absent "$home/.gitconfig" || return 1
+    assert_absent "$home/.tool/config.toml" || return 1
+    assert_absent "$home/.tool/items/example.txt" || return 1
+    assert_absent "$home/.tool/package" || return 1
+    assert_absent "$home/.oh-my-zsh/themes/my.zsh-theme" || return 1
+    assert_regular_dir "$home/.tool" || return 1
+    assert_regular_dir "$home/.tool/items" || return 1
+    assert_file_equals "$home/.tool/local.txt" "local" || return 1
+    assert_file_contains "$uninstall_output" "Uninstall Result" || return 1
+    assert_file_contains "$uninstall_output" "Removals:" || return 1
+    assert_file_contains "$uninstall_output" "OK: uninstall completed" || return 1
+}
+
+test_uninstall_dry_run_does_not_write() {
+    local fixture="$TEST_ROOT/uninstall-dry-run-fixture"
+    local home="$TEST_ROOT/uninstall-dry-run-home"
+    local install_output="$TEST_ROOT/uninstall-dry-run-install-output.log"
+    local uninstall_output="$TEST_ROOT/uninstall-dry-run-output.log"
+
+    setup_fixture "$fixture" "$home" || return 1
+    write_file "$fixture/.zshrc" "zsh" || return 1
+    write_file "$fixture/.tool/config.toml" "config" || return 1
+
+    run_install "$fixture" "$home" "$TEST_BRANCH" "$install_output" || return 1
+    run_uninstall_args "$fixture" "$home" "$TEST_BRANCH" "$uninstall_output" --dry-run || return 1
+
+    assert_file_contains "$uninstall_output" "Dry-run mode" || return 1
+    assert_file_contains "$uninstall_output" "Would remove managed symlink" || return 1
+    assert_file_contains "$uninstall_output" "Planned removals:" || return 1
+    assert_file_contains "$uninstall_output" "no changes were written" || return 1
+    assert_symlink_target "$home/.zshrc" "$fixture/.zshrc" || return 1
+    assert_symlink_target "$home/.tool/config.toml" "$fixture/.tool/config.toml" || return 1
+}
+
 test_invalid_manifest_fails() {
     local fixture="$TEST_ROOT/invalid-manifest-fixture"
     local home="$TEST_ROOT/invalid-manifest-home"
@@ -629,6 +718,9 @@ test_dry_run_does_not_write() {
     assert_file_contains "$output" "Dry-run mode" || return 1
     assert_file_contains "$output" "Would link" || return 1
     assert_file_contains "$output" "Would remove stale or skipped symlink" || return 1
+    assert_file_contains "$output" "Planned links:" || return 1
+    assert_file_contains "$output" "Planned removals:" || return 1
+    assert_file_contains "$output" "Skips:" || return 1
     assert_file_contains "$output" "no changes were written" || return 1
     assert_absent "$home/.zshrc" || return 1
     assert_absent "$home/.tool/items/current.txt" || return 1
@@ -689,6 +781,8 @@ run_test "aggregate runner rejects invalid profile manifest" test_aggregate_runn
 run_test "unmanaged entry conflict" test_unmanaged_entry_conflict
 run_test "stale managed symlink cleanup" test_stale_managed_symlink_cleanup
 run_test "inactive profile tool-root cleanup" test_inactive_profile_tool_root_cleanup
+run_test "uninstall removes managed symlinks" test_uninstall_removes_managed_symlinks
+run_test "uninstall dry-run does not write" test_uninstall_dry_run_does_not_write
 run_test "invalid manifest fails" test_invalid_manifest_fails
 run_test "duplicate profile manifest kind fails" test_duplicate_profile_manifest_kind_fails
 run_test "invalid surface path fails" test_invalid_surface_path_fails

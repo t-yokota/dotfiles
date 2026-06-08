@@ -29,6 +29,7 @@ profile/<name>/<environment>
 ```text
 .
 ├── install.sh
+├── uninstall.sh
 ├── scripts/
 │   └── install/
 │       ├── lib/
@@ -53,6 +54,7 @@ profile/<name>/<environment>
 主な役割は次の通りです。
 
 - `install.sh`: 共通 installer の entrypoint です。CLI option、`DOTPATH` / `HOME` の初期化、library 読み込み、install phase の実行順だけを持ちます。
+- `uninstall.sh`: 共通 uninstaller の entrypoint です。現在の dotfiles checkout が実 HOME に作った symlink だけを外します。通常ファイル、別 checkout への symlink、runtime state は削除しません。
 - `scripts/install/lib/common.sh`: 共通 helper です。log 出力、dry-run 判定、branch 取得、path 解決など、profile policy を持たない処理を置きます。
 - `scripts/install/lib/profile.sh`: profile manifest loader です。現在の branch に合う profile を選び、`profile.tsv`, `surfaces.tsv`, `skipsets.tsv` を検証して installer state に読み込み、profile 固有 check を実行します。
 - `scripts/install/lib/reconcile.sh`: desired state と HOME の actual state を突き合わせる engine です。未管理 path の conflict check、dotfiles 管理 symlink の cleanup、top-level dotfile / managed surface / shell theme の symlink 作成を担当します。
@@ -78,6 +80,15 @@ bash install.sh
 bash install.sh --dry-run
 bash install.sh --help
 ```
+
+現在の dotfiles checkout が実 HOME に作った symlink をまとめて外したい場合は、`uninstall.sh` を使います。`install.sh` と同じく `--dry-run` / `-n` で削除予定だけを確認できます。
+
+```bash
+bash uninstall.sh --dry-run
+bash uninstall.sh
+```
+
+`install.sh` / `uninstall.sh` の Result には、link / removal / skip などの件数が表示されます。
 
 installer と active profile の動作確認には、実際の `~/dotfiles` や `$HOME` を変更しない verification script を使えます。`test-all.sh` は複数の verification script をまとめて実行するための runner で、必要に応じて各 script を個別に実行することもできます。
 
@@ -242,23 +253,19 @@ check script は選択中の branch の profile を現在の環境に適用す�
 ## Safety Rules
 
 - `install.sh` は未管理の通常ファイルを上書きしません。
+- `uninstall.sh` は、この dotfiles checkout を指す symlink だけを削除します。通常ファイルや directory は削除しません。
 - cleanup は、この dotfiles checkout を指す symlink だけを削除します。
 - `entries` surface の link 先 directory と `whole` surface の親 directory は、通常 directory である必要があります。未管理 symlink 越しには書き込みません。
 - credential、cache、backup、machine-local config といった local / runtime state は shared commit に含めません。
 
 ## Future Work
 
-今後の改善候補は、共通 dotfiles 基盤と profile 固有の改善を分けて扱います。番号は優先度順です。共通 installer の安全性や運用性に関わるものを先に進め、ECC 固有の挙動は別の設計課題として扱います。
-
-### Common Installer
-
-1. `uninstall.sh` を追加し、現在の dotfiles checkout が実 HOME に作った symlink をまとめて外せるようにします。
-2. installer / uninstaller の Result 表示を拡張し、link / skip / cleanup などの件数を確認できるようにします。
+今後の改善候補は、共通 dotfiles 基盤と profile 固有の改善を分けて扱います。番号は優先度順です。ECC 固有の挙動と profile 運用の補助は別の設計課題として扱います。
 
 ### ECC Profile
 
-3. Claude / Codex の適用対象を選択できるようにします。`install.sh` は最低どちらか一方の desired state が準備されていれば適用可能とし、両方必須にはしない方針です。
+1. Claude / Codex の適用対象を選択できるようにします。`install.sh` は最低どちらか一方の desired state が準備されていれば適用可能とし、両方必須にはしない方針です。
 
 ### Profile Operations
 
-4. 共通 installer や profile の共通部分を、`main` と profile branch 間で同期しやすくする補助を検討します。
+2. 共通 installer や profile の共通部分を、`main` と profile branch 間で同期しやすくする補助を検討します。
