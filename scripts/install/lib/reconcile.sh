@@ -8,6 +8,8 @@ remove_managed_path() {
     local description="$1"
     local path="$2"
 
+    summary_mark_remove_path "$path" || return 0
+
     if is_dry_run; then
         summary_increment would_remove
         log_substep "Would remove $description: $path"
