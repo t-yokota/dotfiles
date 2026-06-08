@@ -9,10 +9,12 @@ remove_managed_path() {
     local path="$2"
 
     if is_dry_run; then
+        summary_increment would_remove
         log_substep "Would remove $description: $path"
         return 0
     fi
 
+    summary_increment removed
     log_substep "Remove $description: $path"
     rm -f "$path"
 }

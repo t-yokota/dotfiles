@@ -289,6 +289,9 @@ test_base_profile_entry_links() {
     assert_absent "$home/.gitignore" || return 1
     assert_absent "$home/.gitconfig.local" || return 1
     assert_file_contains "$output" "Install Result" || return 1
+    assert_file_contains "$output" "Links:" || return 1
+    assert_file_contains "$output" "Removals:" || return 1
+    assert_file_contains "$output" "Skips:" || return 1
     assert_file_contains "$output" "OK: install completed; changes were written by the common installer" || return 1
 }
 
@@ -583,6 +586,7 @@ test_uninstall_removes_managed_symlinks() {
     assert_regular_dir "$home/.tool/items" || return 1
     assert_file_equals "$home/.tool/local.txt" "local" || return 1
     assert_file_contains "$uninstall_output" "Uninstall Result" || return 1
+    assert_file_contains "$uninstall_output" "Removals:" || return 1
     assert_file_contains "$uninstall_output" "OK: uninstall completed" || return 1
 }
 
@@ -601,6 +605,7 @@ test_uninstall_dry_run_does_not_write() {
 
     assert_file_contains "$uninstall_output" "Dry-run mode" || return 1
     assert_file_contains "$uninstall_output" "Would remove managed symlink" || return 1
+    assert_file_contains "$uninstall_output" "Planned removals:" || return 1
     assert_file_contains "$uninstall_output" "no changes were written" || return 1
     assert_symlink_target "$home/.zshrc" "$fixture/.zshrc" || return 1
     assert_symlink_target "$home/.tool/config.toml" "$fixture/.tool/config.toml" || return 1
@@ -713,6 +718,9 @@ test_dry_run_does_not_write() {
     assert_file_contains "$output" "Dry-run mode" || return 1
     assert_file_contains "$output" "Would link" || return 1
     assert_file_contains "$output" "Would remove stale or skipped symlink" || return 1
+    assert_file_contains "$output" "Planned links:" || return 1
+    assert_file_contains "$output" "Planned removals:" || return 1
+    assert_file_contains "$output" "Skips:" || return 1
     assert_file_contains "$output" "no changes were written" || return 1
     assert_absent "$home/.zshrc" || return 1
     assert_absent "$home/.tool/items/current.txt" || return 1

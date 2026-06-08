@@ -80,8 +80,10 @@ uninstall_shell_themes || exit 1
 
 if is_dry_run; then
     log_section "Dry-run Result"
+    log_result_summary uninstall
     log_step "OK: no changes were written by the common uninstaller"
 else
     log_section "Uninstall Result"
+    log_result_summary uninstall
     log_step "OK: uninstall completed; dotfiles-managed symlinks were removed"
 fi

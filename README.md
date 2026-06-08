@@ -88,6 +88,8 @@ bash uninstall.sh --dry-run
 bash uninstall.sh
 ```
 
+`install.sh` / `uninstall.sh` の Result には、link / removal / skip などの件数が表示されます。
+
 installer と active profile の動作確認には、実際の `~/dotfiles` や `$HOME` を変更しない verification script を使えます。`test-all.sh` は複数の verification script をまとめて実行するための runner で、必要に応じて各 script を個別に実行することもできます。
 
 - `scripts/install/test-all.sh` は複数の verification script をまとめて実行する runner です。installer regression test を実行したあと、現在の branch に対応する profile smoke test があれば続けて実行します。
@@ -258,16 +260,12 @@ check script は選択中の branch の profile を現在の環境に適用す�
 
 ## Future Work
 
-今後の改善候補は、共通 dotfiles 基盤と profile 固有の改善を分けて扱います。番号は優先度順です。共通 installer の安全性や運用性に関わるものを先に進め、ECC 固有の挙動は別の設計課題として扱います。
-
-### Common Installer
-
-1. installer / uninstaller の Result 表示を拡張し、link / skip / cleanup などの件数を確認できるようにします。
+今後の改善候補は、共通 dotfiles 基盤と profile 固有の改善を分けて扱います。番号は優先度順です。ECC 固有の挙動と profile 運用の補助は別の設計課題として扱います。
 
 ### ECC Profile
 
-2. Claude / Codex の適用対象を選択できるようにします。`install.sh` は最低どちらか一方の desired state が準備されていれば適用可能とし、両方必須にはしない方針です。
+1. Claude / Codex の適用対象を選択できるようにします。`install.sh` は最低どちらか一方の desired state が準備されていれば適用可能とし、両方必須にはしない方針です。
 
 ### Profile Operations
 
-3. 共通 installer や profile の共通部分を、`main` と profile branch 間で同期しやすくする補助を検討します。
+2. 共通 installer や profile の共通部分を、`main` と profile branch 間で同期しやすくする補助を検討します。
