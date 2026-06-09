@@ -19,7 +19,7 @@ is_reserved_root_entry() {
     list_contains "$name" "${RESERVED_ROOT_ENTRIES[@]}"
 }
 
-# Repo-local control files and tool runtime roots are never linked as top-level
+# Repo-local control files and managed roots are never linked as top-level
 # entries. Active profile source roots are also reserved dynamically from the
 # loaded surface manifest.
 should_skip_root_entry() {
@@ -29,7 +29,7 @@ should_skip_root_entry() {
             ;;
     esac
 
-    is_tool_root "$1" && return 0
+    is_managed_root "$1" && return 0
     is_reserved_root_entry "$1"
 }
 
@@ -69,6 +69,20 @@ validate_surface_manifest_path() {
             return 1
             ;;
     esac
+}
+
+validate_surface_managed_root() {
+    local file="$1"
+    local line_number="$2"
+    local field_name="$3"
+    local path="$4"
+    local root_entry
+
+    root_entry=$(root_entry_for_path "$path")
+    if ! is_managed_root "$root_entry"; then
+        manifest_error "$file" "$line_number" "$field_name root must be one of managed roots: $(managed_root_summary)"
+        return 1
+    fi
 }
 
 validate_profile_manifest_line() {
@@ -171,6 +185,8 @@ validate_surfaces_line() {
 
     validate_surface_manifest_path "$file" "$line_number" "surface source" "$source_rel" "DOTPATH" || return 1
     validate_surface_manifest_path "$file" "$line_number" "surface dest" "$dest_rel" "HOME" || return 1
+    validate_surface_managed_root "$file" "$line_number" "surface source" "$source_rel" || return 1
+    validate_surface_managed_root "$file" "$line_number" "surface dest" "$dest_rel" || return 1
 
     if [ -z "$skipset" ]; then
         manifest_error "$file" "$line_number" "surface row requires a skipset"

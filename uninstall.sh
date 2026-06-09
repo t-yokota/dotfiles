@@ -95,10 +95,11 @@ log_surface_manifests
 uninstall_all_managed_surfaces || exit 1
 uninstall_scope_result "managed dotfile surface links"
 
-log_section "Remove Unscoped Tool-Root Links"
+log_section "Remove Unscoped Managed Links"
 uninstall_scope_begin
-uninstall_tool_root_symlinks || exit 1
-uninstall_scope_result "unscoped tool-root links"
+log_managed_roots
+uninstall_unscoped_managed_links || exit 1
+uninstall_scope_result "unscoped managed links"
 
 log_section "Remove Shell Theme Links"
 uninstall_scope_begin

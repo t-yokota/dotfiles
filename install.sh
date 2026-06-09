@@ -76,8 +76,8 @@ log_step "Prune stale top-level symlinks"
 cleanup_root_symlinks || exit 1
 log_step "Prune stale managed dotfile surface symlinks"
 cleanup_all_managed_surfaces || exit 1
-log_step "Prune orphaned tool-root symlinks"
-cleanup_orphaned_tool_root_symlinks || exit 1
+log_step "Prune orphaned managed-root symlinks"
+cleanup_orphaned_managed_root_symlinks || exit 1
 cleanup_removed=$((INSTALL_SUMMARY_REMOVED - cleanup_removed_before))
 cleanup_would_remove=$((INSTALL_SUMMARY_WOULD_REMOVE - cleanup_would_remove_before))
 if is_dry_run; then

@@ -387,7 +387,7 @@ status_scan_managed_inventory() {
         done
     }
 
-    for root in "${TOOL_ROOTS[@]}"; do
+    for root in "${MANAGED_ROOTS[@]}"; do
         status_scan_dir_symlinks "$HOME/$root"
     done
 
