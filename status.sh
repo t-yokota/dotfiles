@@ -43,23 +43,22 @@ cd "$DOTPATH" || { echo "Error: Could not cd to $DOTPATH"; exit 1; }
 # Include hidden managed entries such as .claude/.agents, and make empty globs disappear.
 shopt -s nullglob dotglob
 
-MANAGED_SURFACES=()
-SKIPSET_PATTERNS=()
-KNOWN_SKIPSETS=()
-RESERVED_ROOT_ENTRIES=()
-ACTIVE_PROFILE_CHECK_DIRS=()
-
 INSTALL_LIB_DIR="$DOTPATH/scripts/install/lib"
-for lib in common profile reconcile status; do
-    lib_path="$INSTALL_LIB_DIR/$lib.sh"
-    if [ ! -f "$lib_path" ]; then
-        echo "Error: missing installer library: $lib_path" >&2
-        exit 1
-    fi
-    . "$lib_path"
-done
+COMMON_LIB="$INSTALL_LIB_DIR/common.sh"
+if [ ! -f "$COMMON_LIB" ]; then
+    echo "Error: missing installer library: $COMMON_LIB" >&2
+    exit 1
+fi
+. "$COMMON_LIB"
+init_installer_state
+load_installer_libraries profile reconcile status || exit 1
 
 BRANCH=$(get_current_branch)
+
+if [ "$STATUS_VERBOSE" -eq 1 ]; then
+    log_section "Mode"
+    log_step "Verbose mode: detailed status paths will be printed"
+fi
 
 log_section "Context"
 log_step "DOTPATH: $DOTPATH"
@@ -69,15 +68,21 @@ log_step "Branch: ${BRANCH:-<unknown>}"
 log_section "Preflight"
 log_step "Load active profile manifests"
 load_active_profile_manifests || exit 1
+status_summary_step "OK: preflight passed"
 
-log_section "Desired Link Status"
+log_section "Desired Top-Level Dotfile Links"
 status_root_entries
+
+log_section "Desired Managed Dotfile Surface Links"
+log_surface_manifests
 status_all_managed_surfaces
+
+log_section "Desired Shell Theme Links"
 status_shell_themes
 
-log_section "Existing Managed Links"
+log_section "Unexpected Managed Links"
 status_scan_managed_inventory
 
 log_section "Status Result"
 status_result_summary
-log_step "OK: status checked; no changes were written"
+status_result_message

@@ -5,19 +5,25 @@
 # top-level, managed-surface, and shell-theme symlinks.
 
 remove_managed_path() {
-    local description="$1"
-    local path="$2"
+    local path="$1"
+    local target
+    local detail="$path"
 
     summary_mark_remove_path "$path" || return 0
 
+    if [ -L "$path" ]; then
+        target=$(readlink "$path")
+        [ -n "$target" ] && detail="$path -> $target"
+    fi
+
     if is_dry_run; then
         summary_increment would_remove
-        log_substep "Would remove $description: $path"
+        log_substep "Would remove symlink: $detail"
         return 0
     fi
 
     summary_increment removed
-    log_substep "Remove $description: $path"
+    log_substep "Remove symlink: $detail"
     rm -f "$path"
 }
 
@@ -54,7 +60,7 @@ check_managed_entry() {
     local dest_path="$1"
     local managed_root="$2"
 
-    if [ -e "$dest_path" ] || [ -L "$dest_path" ]; then
+    if path_exists_or_link "$dest_path"; then
         if ! is_managed_symlink "$dest_path" "$managed_root"; then
             echo "Error: $dest_path already exists and is not a dotfiles-managed symlink." >&2
             echo "Move or merge it before rerunning install.sh." >&2
@@ -104,7 +110,7 @@ preflight_root_entries() {
     local f name
 
     for f in .??*; do
-        [ -e "$f" ] || [ -L "$f" ] || continue
+        path_exists_or_link "$f" || continue
         name=$(basename "$f")
         should_skip_root_entry "$name" && continue
 
@@ -121,7 +127,7 @@ preflight_managed_entries() {
     check_destination_container "$dest_dir" || return 1
 
     for f in "$source_dir"/*; do
-        [ -e "$f" ] || [ -L "$f" ] || continue
+        path_exists_or_link "$f" || continue
         name=$(basename "$f")
         should_skip_entry "$skipset" "$name" && continue
 
@@ -133,7 +139,7 @@ preflight_whole_surface() {
     local source_path="$1"
     local dest_path="$2"
 
-    [ -e "$source_path" ] || [ -L "$source_path" ] || return 0
+    path_exists_or_link "$source_path" || return 0
 
     check_whole_destination_parent "$dest_path" || return 1
     check_managed_entry "$dest_path" "$source_path" || return 1
@@ -167,7 +173,7 @@ cleanup_managed_symlinks() {
 
     if [ "$container_policy" != "allow-container-symlink" ] && [ -L "$dest_dir" ]; then
         if is_managed_symlink "$dest_dir" "$source_dir"; then
-            remove_managed_path "managed container symlink" "$dest_dir"
+            remove_managed_path "$dest_dir"
             return 0
         fi
 
@@ -179,14 +185,14 @@ cleanup_managed_symlinks() {
     [ -d "$dest_dir" ] || return 0
 
     for dest in "$dest_dir"/*; do
-        [ -e "$dest" ] || [ -L "$dest" ] || continue
+        path_exists_or_link "$dest" || continue
         name=$(basename "$dest")
 
         if is_managed_symlink "$dest" "$source_dir"; then
             target=$(readlink "$dest")
             child_source="$source_dir/$name"
             if [ ! -e "$target" ] || { should_skip_entry "$skipset" "$name" && ! is_surface_source "$child_source"; }; then
-                remove_managed_path "stale or skipped symlink" "$dest"
+                remove_managed_path "$dest"
             fi
         fi
     done
@@ -200,24 +206,24 @@ cleanup_whole_surface() {
     if is_managed_symlink "$dest_path" "$source_path"; then
         target=$(readlink "$dest_path")
         if [ ! -e "$target" ]; then
-            remove_managed_path "stale whole-entry symlink" "$dest_path"
+            remove_managed_path "$dest_path"
         fi
     fi
 }
 
-cleanup_orphaned_tool_root_symlinks() {
+cleanup_orphaned_managed_root_symlinks() {
     local root dest_dir dest target
 
-    for root in .claude .codex .agents; do
+    for root in "${MANAGED_ROOTS[@]}"; do
         dest_dir="$HOME/$root"
-        [ -e "$dest_dir" ] || [ -L "$dest_dir" ] || continue
+        path_exists_or_link "$dest_dir" || continue
 
         if is_managed_symlink "$dest_dir" "$DOTPATH"; then
             target=$(readlink "$dest_dir")
-            if [ -e "$target" ] || [ -L "$target" ]; then
+            if path_exists_or_link "$target"; then
                 continue
             fi
-            remove_managed_path "stale symlink" "$dest_dir"
+            remove_managed_path "$dest_dir"
             continue
         fi
 
@@ -226,10 +232,10 @@ cleanup_orphaned_tool_root_symlinks() {
         while IFS= read -r -d '' dest; do
             is_managed_symlink "$dest" "$DOTPATH" || continue
             target=$(readlink "$dest")
-            if [ -e "$target" ] || [ -L "$target" ]; then
+            if path_exists_or_link "$target"; then
                 continue
             fi
-            remove_managed_path "stale symlink" "$dest"
+            remove_managed_path "$dest"
         done < <(find "$dest_dir" -type l -print0)
     done
 }
@@ -240,13 +246,13 @@ cleanup_root_symlinks() {
     [ -d "$HOME" ] || return 0
 
     for dest in "$HOME"/*; do
-        [ -e "$dest" ] || [ -L "$dest" ] || continue
+        path_exists_or_link "$dest" || continue
         name=$(basename "$dest")
 
         if is_managed_symlink "$dest" "$DOTPATH"; then
             target=$(readlink "$dest")
             if [ ! -e "$target" ] || should_skip_root_entry "$name"; then
-                remove_managed_path "stale or reserved top-level symlink" "$dest"
+                remove_managed_path "$dest"
             fi
         fi
     done
@@ -265,7 +271,7 @@ link_managed_entries() {
     cleanup_managed_symlinks "$source_dir" "$dest_dir" "$skipset" || return 1
 
     for f in "$source_dir"/*; do
-        [ -e "$f" ] || [ -L "$f" ] || continue
+        path_exists_or_link "$f" || continue
         name=$(basename "$f")
         dest="$dest_dir/$name"
         child_source="$source_dir/$name"
@@ -273,7 +279,7 @@ link_managed_entries() {
         if should_skip_entry "$skipset" "$name"; then
             log_substep "Skip runtime or separately managed entry: $f"
             if is_managed_symlink "$dest" "$source_dir" && ! is_surface_source "$child_source"; then
-                remove_managed_path "previously linked skipped entry" "$dest"
+                remove_managed_path "$dest"
             fi
             continue
         fi
@@ -287,7 +293,7 @@ link_whole_surface() {
     local dest_path="$2"
     local parent="${dest_path%/*}"
 
-    [ -e "$source_path" ] || [ -L "$source_path" ] || return 0
+    path_exists_or_link "$source_path" || return 0
 
     check_whole_destination_parent "$dest_path" || return 1
     ensure_directory "$parent" || return 1
@@ -329,7 +335,7 @@ preflight_shell_themes() {
     [ -d "$OH_MY_ZSH_THEMES" ] || return 0
 
     for theme in "$DOTPATH"/*.zsh-theme; do
-        [ -e "$theme" ] || [ -L "$theme" ] || continue
+        path_exists_or_link "$theme" || continue
         theme_dest="$OH_MY_ZSH_THEMES/$(basename "$theme")"
         check_managed_entry "$theme_dest" "$DOTPATH" || return 1
     done
@@ -340,11 +346,13 @@ link_all_managed_surfaces() {
 
     for surface in "${MANAGED_SURFACES[@]}"; do
         IFS=$'\t' read -r strategy source_path dest_path skipset label <<< "$surface"
-        [ -e "$source_path" ] || [ -L "$source_path" ] || continue
-        log_step "$label"
-        log_substep "Strategy: $strategy"
-        log_substep "Source: $source_path"
-        log_substep "Target: $dest_path"
+        path_exists_or_link "$source_path" || continue
+        if should_log_detail; then
+            log_step "$label"
+            log_substep "Strategy: $strategy"
+            log_substep "Source: $source_path"
+            log_substep "Target: $dest_path"
+        fi
         case "$strategy" in
             entries) link_managed_entries "$source_path" "$dest_path" "$skipset" || return 1 ;;
             whole) link_whole_surface "$source_path" "$dest_path" || return 1 ;;
@@ -363,7 +371,7 @@ link_shell_themes() {
     log_step "Source: $DOTPATH"
     log_step "Target: $OH_MY_ZSH_THEMES"
     for theme in "$DOTPATH"/*.zsh-theme; do
-        [ -e "$theme" ] || [ -L "$theme" ] || continue
+        path_exists_or_link "$theme" || continue
         theme_dest="$OH_MY_ZSH_THEMES/$(basename "$theme")"
         link_managed_entry "$theme" "$theme_dest" "$DOTPATH" || return 1
     done
@@ -375,9 +383,9 @@ uninstall_root_symlinks() {
     [ -d "$HOME" ] || return 0
 
     for dest in "$HOME"/*; do
-        [ -e "$dest" ] || [ -L "$dest" ] || continue
+        path_exists_or_link "$dest" || continue
         is_managed_symlink "$dest" "$DOTPATH" || continue
-        remove_managed_path "managed symlink" "$dest"
+        remove_managed_path "$dest"
     done
 }
 
@@ -387,16 +395,16 @@ uninstall_managed_entries() {
     local dest
 
     if is_managed_symlink "$dest_dir" "$source_dir"; then
-        remove_managed_path "managed surface symlink" "$dest_dir"
+        remove_managed_path "$dest_dir"
         return 0
     fi
 
     [ -d "$dest_dir" ] || return 0
 
     for dest in "$dest_dir"/*; do
-        [ -e "$dest" ] || [ -L "$dest" ] || continue
+        path_exists_or_link "$dest" || continue
         is_managed_symlink "$dest" "$source_dir" || continue
-        remove_managed_path "managed surface symlink" "$dest"
+        remove_managed_path "$dest"
     done
 }
 
@@ -405,7 +413,7 @@ uninstall_whole_surface() {
     local dest_path="$2"
 
     is_managed_symlink "$dest_path" "$source_path" || return 0
-    remove_managed_path "managed surface symlink" "$dest_path"
+    remove_managed_path "$dest_path"
 }
 
 uninstall_all_managed_surfaces() {
@@ -420,15 +428,15 @@ uninstall_all_managed_surfaces() {
     done
 }
 
-uninstall_tool_root_symlinks() {
+uninstall_unscoped_managed_links() {
     local root dest_dir dest
 
-    for root in .claude .codex .agents; do
+    for root in "${MANAGED_ROOTS[@]}"; do
         dest_dir="$HOME/$root"
-        [ -e "$dest_dir" ] || [ -L "$dest_dir" ] || continue
+        path_exists_or_link "$dest_dir" || continue
 
         if is_managed_symlink "$dest_dir" "$DOTPATH"; then
-            remove_managed_path "managed symlink" "$dest_dir"
+            remove_managed_path "$dest_dir"
             continue
         fi
 
@@ -436,7 +444,7 @@ uninstall_tool_root_symlinks() {
 
         while IFS= read -r -d '' dest; do
             is_managed_symlink "$dest" "$DOTPATH" || continue
-            remove_managed_path "managed symlink" "$dest"
+            remove_managed_path "$dest"
         done < <(find "$dest_dir" -type l -print0)
     done
 }
@@ -447,8 +455,8 @@ uninstall_shell_themes() {
     [ -d "$OH_MY_ZSH_THEMES" ] || return 0
 
     for theme_dest in "$OH_MY_ZSH_THEMES"/*; do
-        [ -e "$theme_dest" ] || [ -L "$theme_dest" ] || continue
+        path_exists_or_link "$theme_dest" || continue
         is_managed_symlink "$theme_dest" "$DOTPATH" || continue
-        remove_managed_path "managed shell theme symlink" "$theme_dest"
+        remove_managed_path "$theme_dest"
     done
 }

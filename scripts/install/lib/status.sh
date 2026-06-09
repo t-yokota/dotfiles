@@ -33,24 +33,62 @@ status_scope_begin() {
 }
 
 status_note() {
-    local message="$1"
+    status_emit_summary "$1"
+}
 
-    STATUS_SECTION_VISIBLE=$((STATUS_SECTION_VISIBLE + 1))
-    printf '    - '
-    color_green "$message"
-    printf '\n'
+status_attention() {
+    status_emit_summary "$1"
+}
+
+status_verbose_enabled() {
+    [ "${STATUS_VERBOSE:-0}" = "1" ]
 }
 
 status_info() {
+    status_emit_summary "$1"
+}
+
+status_emit_summary() {
     local message="$1"
 
     STATUS_SECTION_VISIBLE=$((STATUS_SECTION_VISIBLE + 1))
-    printf '    - %s\n' "$message"
+    status_summary_step "$message"
+}
+
+status_summary_step() {
+    local message="$1"
+
+    case "$message" in
+        OK:*)
+            printf '  '
+            color_green "$message"
+            printf '\n'
+            ;;
+        Check:*|Warn:*)
+            printf '  '
+            color_yellow "$message"
+            printf '\n'
+            ;;
+        Error:*)
+            printf '  '
+            color_red "$message"
+            printf '\n'
+            ;;
+        "No desired"*)
+            printf '  '
+            color_gray "$message"
+            printf '\n'
+            ;;
+        *)
+            printf '  %s\n' "$message"
+            ;;
+    esac
 }
 
 status_scope_end() {
     local empty_message="$1"
-    local ok_message="$2"
+    local summary_label="$2"
+    local empty_label="${empty_message%.}"
     local linked_delta=$((STATUS_LINKED - STATUS_SCOPE_LINKED))
     local missing_delta=$((STATUS_MISSING - STATUS_SCOPE_MISSING))
     local conflict_delta=$((STATUS_CONFLICT - STATUS_SCOPE_CONFLICT))
@@ -59,23 +97,40 @@ status_scope_end() {
     local skipped_delta=$((STATUS_SKIPPED - STATUS_SCOPE_SKIPPED))
     local expected_delta=$((${#STATUS_EXPECTED_DESTS[@]} - STATUS_SCOPE_EXPECTED))
 
-    [ "$STATUS_SECTION_VISIBLE" -eq 0 ] || return 0
-
-    if [ "$expected_delta" -eq 0 ] && [ "$skipped_delta" -eq 0 ] && [ "$linked_delta" -eq 0 ]; then
-        status_info "$empty_message"
+    if [ "$expected_delta" -eq 0 ] && [ "$skipped_delta" -eq 0 ] && [ "$linked_delta" -eq 0 ] &&
+        [ "$missing_delta" -eq 0 ] && [ "$conflict_delta" -eq 0 ] &&
+        [ "$stale_delta" -eq 0 ] && [ "$orphaned_delta" -eq 0 ]; then
+        status_info "$empty_label (linked: 0, missing: 0, conflicts: 0, skipped: 0)"
         return 0
     fi
 
     if [ "$missing_delta" -eq 0 ] && [ "$conflict_delta" -eq 0 ] &&
         [ "$stale_delta" -eq 0 ] && [ "$orphaned_delta" -eq 0 ]; then
-        status_note "$ok_message"
+        status_note "OK: $summary_label (linked: $linked_delta, missing: $missing_delta, conflicts: $conflict_delta, skipped: $skipped_delta)"
         return 0
+    fi
+
+    if status_verbose_enabled; then
+        status_attention "Check: $summary_label (linked: $linked_delta, missing: $missing_delta, conflicts: $conflict_delta, stale: $stale_delta, orphaned: $orphaned_delta, skipped: $skipped_delta)"
+    else
+        status_attention "Check: $summary_label (linked: $linked_delta, missing: $missing_delta, conflicts: $conflict_delta, stale: $stale_delta, orphaned: $orphaned_delta, skipped: $skipped_delta); use --verbose to list paths"
     fi
 }
 
 status_inventory_scope_end() {
-    [ "$STATUS_SECTION_VISIBLE" -eq 0 ] || return 0
-    status_note "OK: no orphaned or stale dotfiles-managed symlinks found."
+    local stale_delta=$((STATUS_STALE - STATUS_SCOPE_STALE))
+    local orphaned_delta=$((STATUS_ORPHANED - STATUS_SCOPE_ORPHANED))
+
+    if [ "$stale_delta" -eq 0 ] && [ "$orphaned_delta" -eq 0 ]; then
+        status_note "OK: no unexpected dotfiles-managed links outside current desired state (stale: $stale_delta, orphaned: $orphaned_delta)"
+        return 0
+    fi
+
+    if status_verbose_enabled; then
+        status_attention "Check: unexpected dotfiles-managed links are outside current desired state (stale: $stale_delta, orphaned: $orphaned_delta)"
+    else
+        status_attention "Check: unexpected dotfiles-managed links are outside current desired state (stale: $stale_delta, orphaned: $orphaned_delta); use --verbose to list paths"
+    fi
 }
 
 status_mark_expected() {
@@ -84,22 +139,14 @@ status_mark_expected() {
 
 status_is_expected() {
     local path="$1"
-    local entry
 
-    for entry in "${STATUS_EXPECTED_DESTS[@]}"; do
-        [ "$entry" = "$path" ] && return 0
-    done
-
-    return 1
+    list_contains "$path" "${STATUS_EXPECTED_DESTS[@]}"
 }
 
 status_mark_seen_managed() {
     local path="$1"
-    local entry
 
-    for entry in "${STATUS_SEEN_MANAGED_DESTS[@]}"; do
-        [ "$entry" = "$path" ] && return 1
-    done
+    list_contains "$path" "${STATUS_SEEN_MANAGED_DESTS[@]}" && return 1
 
     STATUS_SEEN_MANAGED_DESTS+=("$path")
     return 0
@@ -114,38 +161,42 @@ status_print() {
             [ "$STATUS_VERBOSE" -eq 1 ] || return 0
             STATUS_SECTION_VISIBLE=$((STATUS_SECTION_VISIBLE + 1))
             printf '    - '
-            color_green "linked: $message"
+            color_cyan "linked: $message"
             printf '\n'
             ;;
         missing)
+            [ "$STATUS_VERBOSE" -eq 1 ] || return 0
             STATUS_SECTION_VISIBLE=$((STATUS_SECTION_VISIBLE + 1))
             printf '    - '
-            color_yellow "missing: $message"
+            color_blue "missing: $message"
             printf '\n'
             ;;
         conflict)
+            [ "$STATUS_VERBOSE" -eq 1 ] || return 0
             STATUS_SECTION_VISIBLE=$((STATUS_SECTION_VISIBLE + 1))
             printf '    - '
             color_magenta "conflict: $message"
             printf '\n'
             ;;
         stale)
+            [ "$STATUS_VERBOSE" -eq 1 ] || return 0
             STATUS_SECTION_VISIBLE=$((STATUS_SECTION_VISIBLE + 1))
             printf '    - '
             color_magenta "stale: $message"
             printf '\n'
             ;;
         orphaned)
+            [ "$STATUS_VERBOSE" -eq 1 ] || return 0
             STATUS_SECTION_VISIBLE=$((STATUS_SECTION_VISIBLE + 1))
             printf '    - '
-            color_yellow "orphaned: $message"
+            color_blue "orphaned: $message"
             printf '\n'
             ;;
         skipped)
             [ "$STATUS_VERBOSE" -eq 1 ] || return 0
             STATUS_SECTION_VISIBLE=$((STATUS_SECTION_VISIBLE + 1))
             printf '    - '
-            color_yellow "skipped: $message"
+            color_gray "skipped: $message"
             printf '\n'
             ;;
     esac
@@ -202,7 +253,7 @@ status_observe_managed_symlink() {
     status_is_expected "$dest_path" && return 0
 
     target=$(readlink "$dest_path")
-    if [ ! -e "$target" ] && [ ! -L "$target" ]; then
+    if ! path_exists_or_link "$target"; then
         status_record stale "$dest_path -> $target"
     else
         status_record orphaned "$dest_path -> $target"
@@ -215,14 +266,14 @@ status_root_entries() {
     log_step "Top-level dotfiles"
     status_scope_begin
     for f in .??*; do
-        [ -e "$f" ] || [ -L "$f" ] || continue
+        path_exists_or_link "$f" || continue
         name=$(basename "$f")
         should_skip_root_entry "$name" && continue
         status_expected_link "$DOTPATH/$name" "$HOME/$name"
     done
     status_scope_end \
         "No desired top-level dotfile links found." \
-        "OK: top-level dotfile links are present; use --verbose to list them."
+        "top-level dotfile links checked"
 }
 
 status_entries_surface() {
@@ -239,7 +290,7 @@ status_entries_surface() {
     fi
 
     for f in "$source_dir"/*; do
-        [ -e "$f" ] || [ -L "$f" ] || continue
+        path_exists_or_link "$f" || continue
         name=$(basename "$f")
         dest="$dest_dir/$name"
         child_source="$source_dir/$name"
@@ -257,7 +308,7 @@ status_whole_surface() {
     local source_path="$1"
     local dest_path="$2"
 
-    [ -e "$source_path" ] || [ -L "$source_path" ] || return 0
+    path_exists_or_link "$source_path" || return 0
     status_expected_link "$source_path" "$dest_path"
 }
 
@@ -274,7 +325,7 @@ status_all_managed_surfaces() {
         esac
         status_scope_end \
             "No desired links found for this surface." \
-            "OK: no reportable issues for this surface; use --verbose to list linked or skipped entries."
+            "$label checked"
     done
 }
 
@@ -287,18 +338,18 @@ status_shell_themes() {
         status_record skipped "$OH_MY_ZSH_THEMES does not exist"
         status_scope_end \
             "No shell theme destination directory found." \
-            "OK: shell theme status has no reportable issues; use --verbose to list skipped entries."
+            "shell theme links checked"
         return 0
     fi
 
     for theme in "$DOTPATH"/*.zsh-theme; do
-        [ -e "$theme" ] || [ -L "$theme" ] || continue
+        path_exists_or_link "$theme" || continue
         theme_dest="$OH_MY_ZSH_THEMES/$(basename "$theme")"
         status_expected_link "$theme" "$theme_dest"
     done
     status_scope_end \
         "No desired shell theme links found." \
-        "OK: shell theme links are present; use --verbose to list them."
+        "shell theme links checked"
 }
 
 status_scan_dir_symlinks() {
@@ -326,17 +377,17 @@ status_scan_active_surface_destinations() {
 status_scan_managed_inventory() {
     local root dest
 
-    log_step "Managed symlink inventory"
+    log_step "Unexpected dotfiles-managed links"
     status_scope_begin
 
     [ -d "$HOME" ] && {
         for dest in "$HOME"/*; do
-            [ -e "$dest" ] || [ -L "$dest" ] || continue
+            path_exists_or_link "$dest" || continue
             status_observe_managed_symlink "$dest"
         done
     }
 
-    for root in .claude .codex .agents; do
+    for root in "${MANAGED_ROOTS[@]}"; do
         status_scan_dir_symlinks "$HOME/$root"
     done
 
@@ -346,10 +397,39 @@ status_scan_managed_inventory() {
 }
 
 status_result_summary() {
-    log_step "Linked: $STATUS_LINKED"
-    log_step "Missing: $STATUS_MISSING"
-    log_step "Conflicts: $STATUS_CONFLICT"
-    log_step "Stale: $STATUS_STALE"
-    log_step "Orphaned: $STATUS_ORPHANED"
-    log_step "Skipped: $STATUS_SKIPPED"
+    local count_width
+
+    count_width=$(max_count_width "$STATUS_LINKED" "$STATUS_MISSING" "$STATUS_CONFLICT" "$STATUS_STALE" "$STATUS_ORPHANED" "$STATUS_SKIPPED")
+
+    status_result_item "Linked" "$STATUS_LINKED" "expected links already point to this dotfiles checkout" "$count_width"
+    status_result_item "Missing" "$STATUS_MISSING" "expected links are absent from HOME" "$count_width"
+    status_result_item "Conflicts" "$STATUS_CONFLICT" "expected destinations exist but are not the expected symlinks" "$count_width"
+    status_result_item "Stale" "$STATUS_STALE" "unexpected managed links point to missing targets" "$count_width"
+    status_result_item "Orphaned" "$STATUS_ORPHANED" "unexpected managed links point to targets outside current desired state" "$count_width"
+    status_result_item "Skipped" "$STATUS_SKIPPED" "entries intentionally excluded by profile skipsets" "$count_width"
+}
+
+status_result_item() {
+    local label="$1"
+    local count="$2"
+    local description="$3"
+    local count_width="$4"
+
+    log_step "$(printf "%-10s: %${count_width}s (%s)" "$label" "$count" "$description")"
+}
+
+status_has_reportable_issues() {
+    [ $((STATUS_MISSING + STATUS_CONFLICT + STATUS_STALE + STATUS_ORPHANED)) -ne 0 ]
+}
+
+status_result_message() {
+    if status_has_reportable_issues; then
+        if status_verbose_enabled; then
+            log_step "Check: reportable link issues found"
+        else
+            log_step "Check: reportable link issues found; review with --verbose"
+        fi
+    else
+        log_ok "status checked; no changes were made"
+    fi
 }

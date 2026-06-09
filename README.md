@@ -4,7 +4,7 @@
 
 このリポジトリは単なる設定ファイルの置き場ではなく、自分の作業環境で様々なポリシーを切り替えながら試すことができる土台になっています。<br>特に AI agent のツールはベストプラクティスが変わり続ける可能性があるため、ベースは薄く保ち、特定ツールとの連携や agent profile 自体は branch と manifest の単位で切りながら扱います。
 
-`.claude/`, `.codex/`, `.agents/` のようなディレクトリは、ディレクトリの root 全体を HOME に symlink しません。credential、cache、session などの runtime state は実 HOME 側に残した上で、再現したい desired state だけを managed surface で管理します。<br>これにより、ベストプラクティスへの追従、複数の policy の切り替え、試行錯誤を git の履歴として扱えるようにします。
+`.claude/`, `.codex/`, `.agents/` のような managed root は、directory root 全体を HOME に symlink しません。credential、cache、session などの runtime state は実 HOME 側に残した上で、再現したい desired state だけを managed surface で管理します。<br>これにより、ベストプラクティスへの追従、複数の policy の切り替え、試行錯誤を git の履歴として扱えるようにします。
 
 ## Branch Strategy
 
@@ -66,7 +66,7 @@ profile/<name>/<environment>
 - `scripts/install/test-installer.sh`: installer の regression test です。`/tmp` に一時的な dotfiles checkout と HOME を作り、実 HOME を触らずに install / dry-run / conflict / cleanup / manifest validation を確認します。
 - `scripts/install/test-profile.sh`: profile smoke test の共通 runner です。指定した `profiles/<name>/` を一時 HOME に適用し、profile manifest と surface の基本動作を確認します。
 - `profiles/<name>/`: profile branch 固有の定義です。surface、skipset、branch-specific check、profile 補助 script、profile-local smoke test wrapper をここに置きます。
-- `.claude/`, `.codex/`, `.agents/`: profile が HOME に出す tool 用 desired state です。root directory ごと symlink するのではなく、profile manifest の surface 定義に従って扱います。
+- `.claude/`, `.codex/`, `.agents/`: managed root です。root directory ごと symlink するのではなく、profile manifest の surface 定義に従って、配下の desired state だけを HOME に出します。
 - `docs/`: profile の背景、手順、外部 tool との対応関係など、README に収めない長めの補足を置きます。
 
 ## Install
@@ -82,6 +82,7 @@ bash install.sh
 
 ```bash
 bash install.sh --dry-run
+bash install.sh --verbose
 bash install.sh --help
 ```
 
@@ -89,12 +90,13 @@ bash install.sh --help
 
 ```bash
 bash uninstall.sh --dry-run
+bash uninstall.sh --verbose
 bash uninstall.sh
 ```
 
-`install.sh` / `uninstall.sh` の Result には、link / removal / skip などの件数が表示されます。
+`install.sh` / `uninstall.sh` の通常表示は phase ごとの OK と Result が中心です。link / remove / skip の件数は section ごとの OK と最後の Result に表示されます。link / remove / skip 単位の詳細ログを確認したい場合は、`--verbose` または短縮形の `-v` を使います。`--dry-run` の場合は、書き込み予定を確認するために詳細ログも表示します。
 
-現在の link 状況を確認したい場合は、`status.sh` を使います。`status.sh` は read-only で、実 HOME へ書き込みません。通常表示では missing / conflict / stale / orphaned などの確認が必要な状態を表示し、`--verbose` を付けると linked / skipped も含めて表示します。
+現在の link 状況を確認したい場合は、`status.sh` を使います。`status.sh` は read-only で、実 HOME へ書き込みません。通常表示では section ごとの件数と Result を表示し、missing / conflict / stale / orphaned がある場合は `Check:` として示します。個別の path まで確認したい場合は、`--verbose` または短縮形の `-v` を使います。
 
 ```bash
 bash status.sh
@@ -170,11 +172,21 @@ bash profiles/ecc/bin/test-profile.sh
 .agents
 ```
 
-`.gitconfig.local` は環境ごとの machine-local 設定です。tracked な `.gitconfig` から include しますが、`install.sh` では作成も symlink もしません。<br>`.claude`, `.codex`, `.agents` は tool runtime root として扱い、profile が有効な場合だけ managed surface 定義に従って entry 単位または package 単位で symlink します。profile がない branch でも、root directory ごと HOME に symlink することはありません。
+`.gitconfig.local` は環境ごとの machine-local 設定です。tracked な `.gitconfig` から include しますが、`install.sh` では作成も symlink もしません。<br>`.claude`, `.codex`, `.agents` は managed root として扱い、profile が有効な場合だけ managed surface 定義に従って entry 単位または package 単位で symlink します。profile がない branch でも、root directory ごと HOME に symlink することはありません。
 
 ## Managed Dotfile Surfaces
 
-managed dotfile surface は、profile branch が tool 用 directory をどの粒度で HOME に出すかを宣言する管理単位です。
+managed dotfile surface は、profile branch が managed root 配下の desired state をどの粒度で HOME に出すかを宣言する管理単位です。
+
+現在の managed root は次の3つです。
+
+```text
+.claude
+.codex
+.agents
+```
+
+managed root は、root directory 自体を HOME に symlink せず、local / runtime state と dotfiles 管理 entry を同じ実 HOME directory 内で共存させるための境界です。`surfaces.tsv` の `<source>` と `<dest>` は、この managed root 配下で定義します。
 
 主な strategy は次の2つです。
 
@@ -236,6 +248,7 @@ surface	entries|whole	<source>	<dest>	<skipset-name|none>	<label>
 - `entries`: `<source>` directory の entry を `<dest>` directory 内へ個別に symlink します。
 - `whole`: `<source>` の file / directory 自体を `<dest>` へ symlink します。
 - `<source>` は dotfiles checkout からの path、`<dest>` は HOME からの path として解決します。どちらも相対 path として書き、絶対 path や `..` を含む path は invalid として扱います。
+- `<source>` と `<dest>` の root は managed root である必要があります。現在は `.claude`, `.codex`, `.agents` 配下だけを managed surface として扱います。
 - `<skipset-name>` は `skipsets.tsv` に定義された名前、または skip しない場合の `none` です。
 - `<label>` は install log に出す説明です。space は使えますが、tab は列区切りとして扱います。
 
