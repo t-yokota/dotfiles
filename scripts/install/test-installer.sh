@@ -115,8 +115,6 @@ checks	checks.d" || return 1
 "# kind	name	pattern
 skipset	managed-root	cache
 skipset	managed-root	sessions
-skipset	managed-root	items
-skipset	managed-root	package
 skipset	managed-root	*.log" || return 1
     write_file "$profile_dir/surfaces.tsv" \
 "# kind	strategy	source	dest	skipset	label
@@ -354,6 +352,29 @@ test_whole_surfaces_and_child_entries() {
     assert_symlink_target "$home/.codex/package" "$fixture/.codex/package" || return 1
 }
 
+test_child_surfaces_are_implicit_skips() {
+    local fixture="$TEST_ROOT/implicit-child-surface-fixture"
+    local home="$TEST_ROOT/implicit-child-surface-home"
+    local output="$TEST_ROOT/implicit-child-surface-output.log"
+    local status_output="$TEST_ROOT/implicit-child-surface-status-output.log"
+
+    setup_fixture "$fixture" "$home" || return 1
+    write_file "$fixture/.codex/items/example.txt" "item" || return 1
+    write_file "$fixture/.codex/package/manifest.json" "{}" || return 1
+
+    run_install_args "$fixture" "$home" "$TEST_BRANCH" "$output" --verbose || return 1
+    run_status_args "$fixture" "$home" "$TEST_BRANCH" "$status_output" --verbose || return 1
+
+    assert_regular_dir "$home/.codex" || return 1
+    assert_regular_dir "$home/.codex/items" || return 1
+    assert_symlink_target "$home/.codex/items/example.txt" "$fixture/.codex/items/example.txt" || return 1
+    assert_symlink_target "$home/.codex/package" "$fixture/.codex/package" || return 1
+    assert_file_contains "$output" "Skip child surface entry: $fixture/.codex/items" || return 1
+    assert_file_contains "$output" "Skip child surface entry: $fixture/.codex/package" || return 1
+    assert_file_contains "$status_output" "skipped: $fixture/.codex/items (managed by child surface)" || return 1
+    assert_file_contains "$status_output" "skipped: $fixture/.codex/package (managed by child surface)" || return 1
+}
+
 test_shell_theme_links() {
     local fixture="$TEST_ROOT/theme-fixture"
     local home="$TEST_ROOT/theme-home"
@@ -366,6 +387,24 @@ test_shell_theme_links() {
     run_install "$fixture" "$home" "$TEST_BRANCH" "$output" || return 1
 
     assert_symlink_target "$home/.oh-my-zsh/themes/my.zsh-theme" "$fixture/my.zsh-theme" || return 1
+}
+
+test_crlf_profile_manifests_load() {
+    local fixture="$TEST_ROOT/crlf-manifest-fixture"
+    local home="$TEST_ROOT/crlf-manifest-home"
+    local output="$TEST_ROOT/crlf-manifest-output.log"
+
+    setup_fixture "$fixture" "$home" || return 1
+    printf 'branch\t%s\r\nskipsets\tskipsets.tsv\r\nsurfaces\tsurfaces.tsv\r\nchecks\tchecks.d\r\n' "$TEST_BRANCH" > "$fixture/profiles/test/profile.tsv" || return 1
+    printf '# kind\tname\tpattern\r\nskipset\tmanaged-root\tcache\r\n' > "$fixture/profiles/test/skipsets.tsv" || return 1
+    printf '# kind\tstrategy\tsource\tdest\tskipset\tlabel\r\nsurface\tentries\t.codex\t.codex\tmanaged-root\tTest managed root\r\n' > "$fixture/profiles/test/surfaces.tsv" || return 1
+    write_file "$fixture/.codex/config.toml" "config" || return 1
+    write_file "$fixture/.codex/cache/session.json" "cache" || return 1
+
+    run_install "$fixture" "$home" "$TEST_BRANCH" "$output" || return 1
+
+    assert_symlink_target "$home/.codex/config.toml" "$fixture/.codex/config.toml" || return 1
+    assert_absent "$home/.codex/cache" || return 1
 }
 
 test_shell_theme_conflict_fails() {
@@ -771,7 +810,7 @@ test_status_reports_link_inventory() {
     assert_file_contains "$output" "expected destinations exist but are not the expected symlinks" || return 1
     assert_file_contains "$output" "unexpected managed links point to missing targets" || return 1
     assert_file_contains "$output" "unexpected managed links point to targets outside current desired state" || return 1
-    assert_file_contains "$output" "entries intentionally excluded by profile skipsets" || return 1
+    assert_file_contains "$output" "entries intentionally excluded by skipsets or child surfaces" || return 1
     assert_file_contains "$output" "Check: top-level dotfile links checked" || return 1
     assert_file_contains "$output" "Check: Test managed root checked" || return 1
     assert_file_contains "$output" "Check: unexpected dotfiles-managed links are outside current desired state" || return 1
@@ -988,9 +1027,11 @@ run_test() {
 log "Workspace: $TEST_ROOT"
 run_test "base profile entry links" test_base_profile_entry_links
 run_test "whole surfaces and child entries" test_whole_surfaces_and_child_entries
+run_test "child surfaces are implicit skips" test_child_surfaces_are_implicit_skips
 run_test "shell theme links" test_shell_theme_links
 run_test "shell theme conflict fails" test_shell_theme_conflict_fails
 run_test "managed roots are not top-level links without profile" test_managed_roots_are_not_top_level_links_without_profile
+run_test "CRLF profile manifests load" test_crlf_profile_manifests_load
 run_test "check ordering by file name" test_check_ordering
 run_test "profile smoke runner" test_profile_smoke_runner
 run_test "profile smoke runner rejects invalid profile manifest" test_profile_smoke_runner_rejects_invalid_profile_manifest
