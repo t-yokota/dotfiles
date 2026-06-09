@@ -130,6 +130,7 @@ preflight_managed_entries() {
         path_exists_or_link "$f" || continue
         name=$(basename "$f")
         should_skip_entry "$skipset" "$name" && continue
+        should_defer_to_child_surface_entry "$source_dir" "$name" && continue
 
         check_managed_entry "$dest_dir/$name" "$source_dir" || return 1
     done
@@ -191,7 +192,9 @@ cleanup_managed_symlinks() {
         if is_managed_symlink "$dest" "$source_dir"; then
             target=$(readlink "$dest")
             child_source="$source_dir/$name"
-            if [ ! -e "$target" ] || { should_skip_entry "$skipset" "$name" && ! is_surface_source "$child_source"; }; then
+            if [ ! -e "$target" ] ||
+                { should_skip_entry "$skipset" "$name" && ! is_surface_source "$child_source"; } ||
+                is_entries_surface_source "$child_source"; then
                 remove_managed_path "$dest"
             fi
         fi
@@ -281,6 +284,11 @@ link_managed_entries() {
             if is_managed_symlink "$dest" "$source_dir" && ! is_surface_source "$child_source"; then
                 remove_managed_path "$dest"
             fi
+            continue
+        fi
+
+        if should_defer_to_child_surface_entry "$source_dir" "$name"; then
+            log_substep "Skip child surface entry: $f"
             continue
         fi
 

@@ -273,14 +273,38 @@ add_managed_surface() {
 
 is_surface_source() {
     local source_path="$1"
+
+    surface_strategy_for_source "$source_path" >/dev/null
+}
+
+surface_strategy_for_source() {
+    local source_path="$1"
     local surface strategy surface_source dest_path skipset label
 
     for surface in "${MANAGED_SURFACES[@]}"; do
         IFS=$'\t' read -r strategy surface_source dest_path skipset label <<< "$surface"
-        [ "$surface_source" = "$source_path" ] && return 0
+        if [ "$surface_source" = "$source_path" ]; then
+            printf '%s\n' "$strategy"
+            return 0
+        fi
     done
 
     return 1
+}
+
+is_entries_surface_source() {
+    local source_path="$1"
+    local strategy
+
+    strategy=$(surface_strategy_for_source "$source_path") || return 1
+    [ "$strategy" = "entries" ]
+}
+
+should_defer_to_child_surface_entry() {
+    local source_dir="$1"
+    local name="$2"
+
+    is_surface_source "$source_dir/$name"
 }
 
 profile_matches_branch() {
@@ -293,6 +317,7 @@ profile_matches_branch() {
     line_number=0
     while IFS= read -r line; do
         line_number=$((line_number + 1))
+        line=${line%$'\r'}
         line_is_ignored "$line" && continue
         validate_profile_manifest_line "$manifest" "$line_number" "$line" || return 2
         IFS=$'\t' read -r kind pattern rest <<< "$line"
@@ -315,6 +340,7 @@ load_skipsets_file() {
     line_number=0
     while IFS= read -r line; do
         line_number=$((line_number + 1))
+        line=${line%$'\r'}
         line_is_ignored "$line" && continue
         validate_skipsets_line "$file" "$line_number" "$line" || return 1
         IFS=$'\t' read -r kind name pattern rest <<< "$line"
@@ -333,6 +359,7 @@ load_surfaces_file() {
     line_number=0
     while IFS= read -r line; do
         line_number=$((line_number + 1))
+        line=${line%$'\r'}
         line_is_ignored "$line" && continue
         validate_surfaces_line "$file" "$line_number" "$line" || return 1
         IFS=$'\t' read -r kind strategy source_rel dest_rel skipset label <<< "$line"
@@ -362,6 +389,7 @@ load_profile_manifest() {
     line_number=0
     while IFS= read -r line; do
         line_number=$((line_number + 1))
+        line=${line%$'\r'}
         line_is_ignored "$line" && continue
         validate_profile_manifest_line "$manifest" "$line_number" "$line" || return 1
         IFS=$'\t' read -r kind value rest <<< "$line"

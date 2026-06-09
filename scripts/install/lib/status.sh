@@ -300,6 +300,11 @@ status_entries_surface() {
             continue
         fi
 
+        if should_defer_to_child_surface_entry "$source_dir" "$name"; then
+            status_record skipped "$f (managed by child surface)"
+            continue
+        fi
+
         status_expected_link "$child_source" "$dest"
     done
 }
@@ -406,7 +411,7 @@ status_result_summary() {
     status_result_item "Conflicts" "$STATUS_CONFLICT" "expected destinations exist but are not the expected symlinks" "$count_width"
     status_result_item "Stale" "$STATUS_STALE" "unexpected managed links point to missing targets" "$count_width"
     status_result_item "Orphaned" "$STATUS_ORPHANED" "unexpected managed links point to targets outside current desired state" "$count_width"
-    status_result_item "Skipped" "$STATUS_SKIPPED" "entries intentionally excluded by profile skipsets" "$count_width"
+    status_result_item "Skipped" "$STATUS_SKIPPED" "entries intentionally excluded by skipsets or child surfaces" "$count_width"
 }
 
 status_result_item() {
