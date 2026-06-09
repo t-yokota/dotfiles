@@ -10,7 +10,7 @@ INSTALL_SUMMARY_WOULD_REMOVE=${INSTALL_SUMMARY_WOULD_REMOVE:-0}
 INSTALL_SUMMARY_SKIPPED=${INSTALL_SUMMARY_SKIPPED:-0}
 INSTALL_SUMMARY_REMOVE_PATHS=()
 INSTALL_VERBOSE=${INSTALL_VERBOSE:-0}
-TOOL_ROOTS=(.claude .codex .agents)
+MANAGED_ROOTS=(.claude .codex .agents)
 
 init_installer_state() {
     MANAGED_SURFACES=()
@@ -50,8 +50,8 @@ path_exists_or_link() {
     [ -e "$1" ] || [ -L "$1" ]
 }
 
-is_tool_root() {
-    list_contains "$1" "${TOOL_ROOTS[@]}"
+is_managed_root() {
+    list_contains "$1" "${MANAGED_ROOTS[@]}"
 }
 
 add_managed_surface_manifest() {
@@ -84,6 +84,29 @@ surface_manifest_summary() {
 
 log_surface_manifests() {
     log_step "Surface manifests: $(surface_manifest_summary)"
+}
+
+managed_root_summary() {
+    local root summary=""
+
+    if [ "${#MANAGED_ROOTS[@]}" -eq 0 ]; then
+        printf '%s' '<none>'
+        return 0
+    fi
+
+    for root in "${MANAGED_ROOTS[@]}"; do
+        if [ -z "$summary" ]; then
+            summary="$root"
+        else
+            summary="$summary, $root"
+        fi
+    done
+
+    printf '%s' "$summary"
+}
+
+log_managed_roots() {
+    log_step "Scan roots: $(managed_root_summary)"
 }
 
 summary_increment() {

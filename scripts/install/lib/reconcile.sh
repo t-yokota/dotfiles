@@ -211,10 +211,10 @@ cleanup_whole_surface() {
     fi
 }
 
-cleanup_orphaned_tool_root_symlinks() {
+cleanup_orphaned_managed_root_symlinks() {
     local root dest_dir dest target
 
-    for root in "${TOOL_ROOTS[@]}"; do
+    for root in "${MANAGED_ROOTS[@]}"; do
         dest_dir="$HOME/$root"
         path_exists_or_link "$dest_dir" || continue
 
@@ -428,10 +428,10 @@ uninstall_all_managed_surfaces() {
     done
 }
 
-uninstall_tool_root_symlinks() {
+uninstall_unscoped_managed_links() {
     local root dest_dir dest
 
-    for root in "${TOOL_ROOTS[@]}"; do
+    for root in "${MANAGED_ROOTS[@]}"; do
         dest_dir="$HOME/$root"
         path_exists_or_link "$dest_dir" || continue
 
