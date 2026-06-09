@@ -6,26 +6,17 @@
 
 add_reserved_root_entry() {
     local name="$1"
-    local entry
 
     [ -n "$name" ] || return 0
-
-    for entry in "${RESERVED_ROOT_ENTRIES[@]}"; do
-        [ "$entry" = "$name" ] && return 0
-    done
+    list_contains "$name" "${RESERVED_ROOT_ENTRIES[@]}" && return 0
 
     RESERVED_ROOT_ENTRIES+=("$name")
 }
 
 is_reserved_root_entry() {
     local name="$1"
-    local entry
 
-    for entry in "${RESERVED_ROOT_ENTRIES[@]}"; do
-        [ "$entry" = "$name" ] && return 0
-    done
-
-    return 1
+    list_contains "$name" "${RESERVED_ROOT_ENTRIES[@]}"
 }
 
 # Repo-local control files and tool runtime roots are never linked as top-level
@@ -33,11 +24,12 @@ is_reserved_root_entry() {
 # loaded surface manifest.
 should_skip_root_entry() {
     case "$1" in
-        .git|.gitignore|.gitconfig.local|.claude|.codex|.agents)
+        .git|.gitignore|.gitconfig.local)
             return 0
             ;;
     esac
 
+    is_tool_root "$1" && return 0
     is_reserved_root_entry "$1"
 }
 
@@ -203,26 +195,17 @@ validate_surfaces_line() {
 
 add_known_skipset() {
     local skipset="$1"
-    local entry
 
     [ -n "$skipset" ] || return 0
-
-    for entry in "${KNOWN_SKIPSETS[@]}"; do
-        [ "$entry" = "$skipset" ] && return 0
-    done
+    list_contains "$skipset" "${KNOWN_SKIPSETS[@]}" && return 0
 
     KNOWN_SKIPSETS+=("$skipset")
 }
 
 is_known_skipset() {
     local skipset="$1"
-    local entry
 
-    for entry in "${KNOWN_SKIPSETS[@]}"; do
-        [ "$entry" = "$skipset" ] && return 0
-    done
-
-    return 1
+    list_contains "$skipset" "${KNOWN_SKIPSETS[@]}"
 }
 
 add_skip_pattern() {
@@ -396,6 +379,7 @@ load_profile_manifest() {
 
     ACTIVE_PROFILE_CHECK_DIRS+=("$profile_dir/$checks_dir")
     load_skipsets_file "$profile_dir/$skipsets_file" || return 1
+    add_managed_surface_manifest "$profile_dir/$surfaces_file"
     load_surfaces_file "$profile_dir/$surfaces_file" || return 1
 }
 

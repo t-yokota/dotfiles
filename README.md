@@ -82,6 +82,7 @@ bash install.sh
 
 ```bash
 bash install.sh --dry-run
+bash install.sh --verbose
 bash install.sh --help
 ```
 
@@ -89,12 +90,13 @@ bash install.sh --help
 
 ```bash
 bash uninstall.sh --dry-run
+bash uninstall.sh --verbose
 bash uninstall.sh
 ```
 
-`install.sh` / `uninstall.sh` の Result には、link / removal / skip などの件数が表示されます。
+`install.sh` / `uninstall.sh` の通常表示は phase ごとの OK と Result が中心です。link / remove / skip の件数は section ごとの OK と最後の Result に表示されます。link / remove / skip 単位の詳細ログを確認したい場合は、`--verbose` または短縮形の `-v` を使います。`--dry-run` の場合は、書き込み予定を確認するために詳細ログも表示します。
 
-現在の link 状況を確認したい場合は、`status.sh` を使います。`status.sh` は read-only で、実 HOME へ書き込みません。通常表示では missing / conflict / stale / orphaned などの確認が必要な状態を表示し、`--verbose` を付けると linked / skipped も含めて表示します。
+現在の link 状況を確認したい場合は、`status.sh` を使います。`status.sh` は read-only で、実 HOME へ書き込みません。通常表示では section ごとの件数と Result を表示し、missing / conflict / stale / orphaned がある場合は `Check:` として示します。個別の path まで確認したい場合は、`--verbose` または短縮形の `-v` を使います。
 
 ```bash
 bash status.sh

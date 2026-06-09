@@ -296,6 +296,16 @@ assert_file_contains() {
     }
 }
 
+assert_file_not_contains() {
+    local path="$1"
+    local text="$2"
+
+    if grep -Fq "$text" "$path"; then
+        log "Expected $path not to contain: $text"
+        return 1
+    fi
+}
+
 test_base_profile_entry_links() {
     local fixture="$TEST_ROOT/base-fixture"
     local home="$TEST_ROOT/base-home"
@@ -321,9 +331,9 @@ test_base_profile_entry_links() {
     assert_absent "$home/.gitignore" || return 1
     assert_absent "$home/.gitconfig.local" || return 1
     assert_file_contains "$output" "Install Result" || return 1
-    assert_file_contains "$output" "Links:" || return 1
-    assert_file_contains "$output" "Removals:" || return 1
-    assert_file_contains "$output" "Skips:" || return 1
+    assert_file_contains "$output" "Links    :" || return 1
+    assert_file_contains "$output" "Removals :" || return 1
+    assert_file_contains "$output" "Skips    :" || return 1
     assert_file_contains "$output" "OK: install completed; changes were written by the common installer" || return 1
 }
 
@@ -577,7 +587,7 @@ surface	entries	.claude/agents	.claude/agents	none	Claude agents" || return 1
     assert_file_equals "$home/.claude/.credentials.json" "local credential" || return 1
 
     rm "$fixture/.claude/AGENTS.md" "$fixture/.claude/agents/reviewer.md" || return 1
-    run_install "$fixture" "$home" "main" "$main_output" || return 1
+    run_install_args "$fixture" "$home" "main" "$main_output" --verbose || return 1
 
     assert_absent "$home/.claude/AGENTS.md" || return 1
     assert_symlink_target "$home/.claude/CLAUDE.md" "$fixture/.claude/CLAUDE.md" || return 1
@@ -586,7 +596,35 @@ surface	entries	.claude/agents	.claude/agents	none	Claude agents" || return 1
     assert_regular_dir "$home/.claude" || return 1
     assert_regular_dir "$home/.claude/agents" || return 1
     assert_file_equals "$home/.claude/.credentials.json" "local credential" || return 1
-    assert_file_contains "$main_output" "Remove stale symlink" || return 1
+    assert_file_contains "$main_output" "Remove symlink: $home/.claude/AGENTS.md -> $fixture/.claude/AGENTS.md" || return 1
+}
+
+test_install_verbose_reports_details() {
+    local fixture="$TEST_ROOT/install-verbose-fixture"
+    local home="$TEST_ROOT/install-verbose-home"
+    local quiet_output="$TEST_ROOT/install-quiet-output.log"
+    local verbose_output="$TEST_ROOT/install-verbose-output.log"
+
+    setup_fixture "$fixture" "$home" || return 1
+    write_file "$fixture/.zshrc" "zsh" || return 1
+    write_file "$fixture/.tool/config.toml" "config" || return 1
+    write_file "$fixture/.tool/cache/session.json" "cache" || return 1
+
+    run_install "$fixture" "$home" "$TEST_BRANCH" "$quiet_output" || return 1
+    run_install_args "$fixture" "$home" "$TEST_BRANCH" "$verbose_output" -v || return 1
+
+    assert_file_contains "$quiet_output" "Install Result" || return 1
+    assert_file_contains "$quiet_output" "OK: preflight passed" || return 1
+    assert_file_contains "$quiet_output" "Surface manifests: $fixture/profiles/test/surfaces.tsv" || return 1
+    assert_file_contains "$quiet_output" "OK: top-level dotfiles reconciled (links:" || return 1
+    assert_file_contains "$quiet_output" "OK: managed dotfile surfaces reconciled (links:" || return 1
+    assert_file_not_contains "$quiet_output" "Create symlink:" || return 1
+    assert_file_not_contains "$quiet_output" "Skip runtime or separately managed entry" || return 1
+    assert_file_contains "$verbose_output" "Verbose mode" || return 1
+    assert_file_contains "$verbose_output" "OK: top-level dotfiles reconciled (links:" || return 1
+    assert_file_contains "$verbose_output" "OK: managed dotfile surfaces reconciled (links:" || return 1
+    assert_file_contains "$verbose_output" "Create symlink:" || return 1
+    assert_file_contains "$verbose_output" "Skip runtime or separately managed entry" || return 1
 }
 
 test_uninstall_removes_managed_symlinks() {
@@ -618,8 +656,40 @@ test_uninstall_removes_managed_symlinks() {
     assert_regular_dir "$home/.tool/items" || return 1
     assert_file_equals "$home/.tool/local.txt" "local" || return 1
     assert_file_contains "$uninstall_output" "Uninstall Result" || return 1
-    assert_file_contains "$uninstall_output" "Removals:" || return 1
+    assert_file_contains "$uninstall_output" "Removals :" || return 1
     assert_file_contains "$uninstall_output" "OK: uninstall completed" || return 1
+}
+
+test_uninstall_verbose_reports_details() {
+    local fixture="$TEST_ROOT/uninstall-verbose-fixture"
+    local quiet_home="$TEST_ROOT/uninstall-verbose-quiet-home"
+    local verbose_home="$TEST_ROOT/uninstall-verbose-detail-home"
+    local quiet_install_output="$TEST_ROOT/uninstall-verbose-quiet-install-output.log"
+    local verbose_install_output="$TEST_ROOT/uninstall-verbose-detail-install-output.log"
+    local quiet_output="$TEST_ROOT/uninstall-quiet-output.log"
+    local verbose_output="$TEST_ROOT/uninstall-verbose-output.log"
+
+    setup_fixture "$fixture" "$quiet_home" || return 1
+    mkdir -p "$verbose_home" || return 1
+    write_file "$fixture/.zshrc" "zsh" || return 1
+    write_file "$fixture/.tool/config.toml" "config" || return 1
+
+    run_install "$fixture" "$quiet_home" "$TEST_BRANCH" "$quiet_install_output" || return 1
+    run_install "$fixture" "$verbose_home" "$TEST_BRANCH" "$verbose_install_output" || return 1
+    run_uninstall "$fixture" "$quiet_home" "$TEST_BRANCH" "$quiet_output" || return 1
+    run_uninstall_args "$fixture" "$verbose_home" "$TEST_BRANCH" "$verbose_output" --verbose || return 1
+
+    assert_file_contains "$quiet_output" "Uninstall Result" || return 1
+    assert_file_contains "$quiet_output" "OK: preflight passed" || return 1
+    assert_file_contains "$quiet_output" "Remove Managed Dotfile Surface Links" || return 1
+    assert_file_contains "$quiet_output" "Surface manifests: $fixture/profiles/test/surfaces.tsv" || return 1
+    assert_file_contains "$quiet_output" "OK: top-level dotfile links completed (removals:" || return 1
+    assert_file_contains "$quiet_output" "OK: managed dotfile surface links completed (removals:" || return 1
+    assert_file_not_contains "$quiet_output" "Remove symlink" || return 1
+    assert_file_contains "$verbose_output" "Verbose mode" || return 1
+    assert_file_contains "$verbose_output" "OK: top-level dotfile links completed (removals:" || return 1
+    assert_file_contains "$verbose_output" "OK: managed dotfile surface links completed (removals:" || return 1
+    assert_file_contains "$verbose_output" "Remove symlink: $verbose_home/.zshrc -> $fixture/.zshrc" || return 1
 }
 
 test_uninstall_dry_run_does_not_write() {
@@ -636,8 +706,8 @@ test_uninstall_dry_run_does_not_write() {
     run_uninstall_args "$fixture" "$home" "$TEST_BRANCH" "$uninstall_output" --dry-run || return 1
 
     assert_file_contains "$uninstall_output" "Dry-run mode" || return 1
-    assert_file_contains "$uninstall_output" "Would remove managed symlink" || return 1
-    assert_file_contains "$uninstall_output" "Planned removals:" || return 1
+    assert_file_contains "$uninstall_output" "Would remove symlink: $home/.zshrc -> $fixture/.zshrc" || return 1
+    assert_file_contains "$uninstall_output" "Planned removals :" || return 1
     assert_file_contains "$uninstall_output" "no changes were written" || return 1
     assert_symlink_target "$home/.zshrc" "$fixture/.zshrc" || return 1
     assert_symlink_target "$home/.tool/config.toml" "$fixture/.tool/config.toml" || return 1
@@ -658,7 +728,7 @@ surface	entries	.claude	.claude	none	Claude root" || return 1
     run_install "$fixture" "$home" "$TEST_BRANCH" "$install_output" || return 1
     run_uninstall_args "$fixture" "$home" "$TEST_BRANCH" "$uninstall_output" --dry-run || return 1
 
-    assert_file_contains "$uninstall_output" "Planned removals: 1" || return 1
+    assert_file_contains "$uninstall_output" "Planned removals : 1" || return 1
     assert_symlink_target "$home/.claude/CLAUDE.md" "$fixture/.claude/CLAUDE.md" || return 1
 }
 
@@ -666,6 +736,7 @@ test_status_reports_link_inventory() {
     local fixture="$TEST_ROOT/status-fixture"
     local home="$TEST_ROOT/status-home"
     local output="$TEST_ROOT/status-output.log"
+    local verbose_output="$TEST_ROOT/status-verbose-issues-output.log"
 
     setup_fixture "$fixture" "$home" || return 1
     mkdir -p "$home/.tool/items" "$home/.oh-my-zsh/themes" || return 1
@@ -683,18 +754,39 @@ test_status_reports_link_inventory() {
     ln -s "$fixture/.tool/cache" "$home/.tool/cache" || return 1
 
     run_status "$fixture" "$home" "$TEST_BRANCH" "$output" || return 1
+    run_status_args "$fixture" "$home" "$TEST_BRANCH" "$verbose_output" --verbose || return 1
 
     assert_file_contains "$output" "Status Result" || return 1
-    assert_file_contains "$output" "Linked:" || return 1
-    assert_file_contains "$output" "Missing:" || return 1
-    assert_file_contains "$output" "Conflicts:" || return 1
-    assert_file_contains "$output" "Stale:" || return 1
-    assert_file_contains "$output" "Orphaned:" || return 1
-    assert_file_contains "$output" "Skipped:" || return 1
-    assert_file_contains "$output" "missing:" || return 1
-    assert_file_contains "$output" "conflict:" || return 1
-    assert_file_contains "$output" "stale:" || return 1
-    assert_file_contains "$output" "orphaned:" || return 1
+    assert_file_contains "$output" "Desired Managed Dotfile Surface Links" || return 1
+    assert_file_contains "$output" "Unexpected Managed Links" || return 1
+    assert_file_contains "$output" "Surface manifests: $fixture/profiles/test/surfaces.tsv" || return 1
+    assert_file_contains "$output" "Linked    :" || return 1
+    assert_file_contains "$output" "Missing   :" || return 1
+    assert_file_contains "$output" "Conflicts :" || return 1
+    assert_file_contains "$output" "Stale     :" || return 1
+    assert_file_contains "$output" "Orphaned  :" || return 1
+    assert_file_contains "$output" "Skipped   :" || return 1
+    assert_file_contains "$output" "expected links already point to this dotfiles checkout" || return 1
+    assert_file_contains "$output" "expected links are absent from HOME" || return 1
+    assert_file_contains "$output" "expected destinations exist but are not the expected symlinks" || return 1
+    assert_file_contains "$output" "unexpected managed links point to missing targets" || return 1
+    assert_file_contains "$output" "unexpected managed links point to targets outside current desired state" || return 1
+    assert_file_contains "$output" "entries intentionally excluded by profile skipsets" || return 1
+    assert_file_contains "$output" "Check: top-level dotfile links checked" || return 1
+    assert_file_contains "$output" "Check: Test tool root checked" || return 1
+    assert_file_contains "$output" "Check: unexpected dotfiles-managed links are outside current desired state" || return 1
+    assert_file_contains "$output" "Check: reportable link issues found; review with --verbose" || return 1
+    assert_file_not_contains "$output" "missing: $home/.gitconfig" || return 1
+    assert_file_not_contains "$output" "conflict: $home/.tool/items/example.txt" || return 1
+    assert_file_not_contains "$output" "stale: $home/.tool/removed.txt" || return 1
+    assert_file_not_contains "$output" "orphaned: $home/.tool/cache" || return 1
+    assert_file_contains "$verbose_output" "Verbose mode" || return 1
+    assert_file_contains "$verbose_output" "missing: $home/.gitconfig" || return 1
+    assert_file_contains "$verbose_output" "conflict: $home/.tool/items/example.txt" || return 1
+    assert_file_contains "$verbose_output" "stale: $home/.tool/removed.txt" || return 1
+    assert_file_contains "$verbose_output" "orphaned: $home/.tool/cache" || return 1
+    assert_file_contains "$verbose_output" "Check: reportable link issues found" || return 1
+    assert_file_not_contains "$verbose_output" "review with --verbose" || return 1
     assert_symlink_target "$home/.zshrc" "$fixture/.zshrc" || return 1
     assert_symlink_target "$home/.tool/removed.txt" "$fixture/.tool/removed.txt" || return 1
 }
@@ -713,8 +805,9 @@ test_status_verbose_reports_linked_and_skipped() {
 
     assert_file_contains "$output" "linked:" || return 1
     assert_file_contains "$output" "skipped:" || return 1
-    assert_file_contains "$output" "No desired links found for this surface." || return 1
-    assert_file_contains "$output" "OK: no orphaned or stale dotfiles-managed symlinks found." || return 1
+    assert_file_contains "$output" "No desired links found for this surface (linked: 0, missing: 0, conflicts: 0, skipped: 0)" || return 1
+    assert_file_contains "$output" "OK: no unexpected dotfiles-managed links outside current desired state (stale: 0, orphaned: 0)" || return 1
+    assert_file_contains "$output" "OK: status checked; no changes were made" || return 1
 }
 
 test_invalid_manifest_fails() {
@@ -822,11 +915,11 @@ test_dry_run_does_not_write() {
     run_install_args "$fixture" "$home" "$TEST_BRANCH" "$output" --dry-run || return 1
 
     assert_file_contains "$output" "Dry-run mode" || return 1
-    assert_file_contains "$output" "Would link" || return 1
-    assert_file_contains "$output" "Would remove stale or skipped symlink" || return 1
-    assert_file_contains "$output" "Planned links:" || return 1
-    assert_file_contains "$output" "Planned removals:" || return 1
-    assert_file_contains "$output" "Skips:" || return 1
+    assert_file_contains "$output" "Would create symlink" || return 1
+    assert_file_contains "$output" "Would remove symlink: $home/.tool/items/removed.txt -> $fixture/.tool/items/removed.txt" || return 1
+    assert_file_contains "$output" "Planned links    :" || return 1
+    assert_file_contains "$output" "Planned removals :" || return 1
+    assert_file_contains "$output" "Skips            :" || return 1
     assert_file_contains "$output" "no changes were written" || return 1
     assert_absent "$home/.zshrc" || return 1
     assert_absent "$home/.tool/items/current.txt" || return 1
@@ -858,7 +951,7 @@ test_shell_theme_dry_run_does_not_write() {
 
     run_install_args "$fixture" "$home" "$TEST_BRANCH" "$output" --dry-run || return 1
 
-    assert_file_contains "$output" "Would link" || return 1
+    assert_file_contains "$output" "Would create symlink" || return 1
     assert_absent "$home/.oh-my-zsh/themes/my.zsh-theme" || return 1
 }
 
@@ -887,7 +980,9 @@ run_test "aggregate runner rejects invalid profile manifest" test_aggregate_runn
 run_test "unmanaged entry conflict" test_unmanaged_entry_conflict
 run_test "stale managed symlink cleanup" test_stale_managed_symlink_cleanup
 run_test "inactive profile tool-root cleanup" test_inactive_profile_tool_root_cleanup
+run_test "install verbose reports details" test_install_verbose_reports_details
 run_test "uninstall removes managed symlinks" test_uninstall_removes_managed_symlinks
+run_test "uninstall verbose reports details" test_uninstall_verbose_reports_details
 run_test "uninstall dry-run does not write" test_uninstall_dry_run_does_not_write
 run_test "uninstall dry-run deduplicates tool-root surface" test_uninstall_dry_run_deduplicates_tool_root_surface
 run_test "status reports link inventory" test_status_reports_link_inventory
