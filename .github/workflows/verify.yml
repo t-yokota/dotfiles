@@ -1,0 +1,35 @@
+name: Verify
+
+on:
+  push:
+    branches:
+      - main
+      - profile/**
+      - integrate/**
+  pull_request:
+
+jobs:
+  installer:
+    name: Installer (${{ matrix.branch }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        branch:
+          - main
+          - profile/ecc-base
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install shellcheck
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y shellcheck
+
+      - name: Shell lint
+        run: bash scripts/install/lint.sh
+
+      - name: Installer tests
+        run: bash scripts/install/test-all.sh --branch "${{ matrix.branch }}"
