@@ -146,3 +146,10 @@ alias voff='deactivate'
 
 ### mise
 eval "$(/home/yokota/.local/bin/mise activate zsh)"
+
+# bun completions
+[ -s "/home/yokota/.bun/_bun" ] && source "/home/yokota/.bun/_bun"
+
+# bun
+export BUN_INSTALL="$HOME/.bun"
+export PATH="$BUN_INSTALL/bin:$PATH"
