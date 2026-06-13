@@ -3,115 +3,63 @@
 # Child surface source entries are skipped implicitly by the installer.
 # The skipsets below list runtime/local state that should stay HOME-local.
 
+# Reusable runtime and credential groups.
+skipset	common-runtime	logs
+skipset	common-runtime	backups
+skipset	common-runtime	cache
+skipset	common-runtime	caches
+skipset	common-runtime	tmp
+skipset	common-runtime	*.log
+skipset	common-runtime	*.db
+skipset	common-runtime	*.sqlite
+skipset	common-runtime	*.sqlite-wal
+skipset	common-runtime	*.sqlite-shm
+
+skipset	credential-state	.credentials.json
+skipset	credential-state	credentials.json
+skipset	credential-state	config.json
+skipset	credential-state	models_cache.json
+skipset	credential-state	session_index.jsonl
+
+skipset	plugin-state	plugins
+skipset	plugin-state	plugin-cache
+
 # .claude root: local lifecycle/runtime state.
+skipset-include	claude-root	common-runtime
+skipset-include	claude-root	credential-state
+skipset-include	claude-root	plugin-state
 skipset	claude-root	ecc
 skipset	claude-root	projects
 skipset	claude-root	session*
 skipset	claude-root	history.jsonl
-skipset	claude-root	logs
-skipset	claude-root	backups
-skipset	claude-root	cache
-skipset	claude-root	caches
-skipset	claude-root	tmp
 skipset	claude-root	statsig
 skipset	claude-root	todos
-skipset	claude-root	plugins
-skipset	claude-root	plugin-cache
-skipset	claude-root	.credentials.json
-skipset	claude-root	credentials.json
-skipset	claude-root	config.json
-skipset	claude-root	models_cache.json
-skipset	claude-root	session_index.jsonl
-skipset	claude-root	*.log
-skipset	claude-root	*.db
-skipset	claude-root	*.sqlite
-skipset	claude-root	*.sqlite-wal
-skipset	claude-root	*.sqlite-shm
 
 # .claude/.agents root: local runtime state.
-skipset	claude-dot-agents	logs
-skipset	claude-dot-agents	backups
-skipset	claude-dot-agents	cache
-skipset	claude-dot-agents	caches
-skipset	claude-dot-agents	tmp
+skipset-include	claude-dot-agents	common-runtime
+skipset-include	claude-dot-agents	credential-state
 skipset	claude-dot-agents	plugin-cache
 skipset	claude-dot-agents	sessions
-skipset	claude-dot-agents	.credentials.json
-skipset	claude-dot-agents	credentials.json
-skipset	claude-dot-agents	config.json
-skipset	claude-dot-agents	models_cache.json
-skipset	claude-dot-agents	session_index.jsonl
-skipset	claude-dot-agents	*.log
-skipset	claude-dot-agents	*.db
-skipset	claude-dot-agents	*.sqlite
-skipset	claude-dot-agents	*.sqlite-wal
-skipset	claude-dot-agents	*.sqlite-shm
 
 # .claude/rules root: local runtime state.
-skipset	claude-rules-root	logs
-skipset	claude-rules-root	backups
-skipset	claude-rules-root	cache
-skipset	claude-rules-root	caches
-skipset	claude-rules-root	tmp
-skipset	claude-rules-root	*.log
-skipset	claude-rules-root	*.db
-skipset	claude-rules-root	*.sqlite
-skipset	claude-rules-root	*.sqlite-wal
-skipset	claude-rules-root	*.sqlite-shm
+skipset-include	claude-rules-root	common-runtime
 
 # .claude/skills root: local runtime state.
-skipset	claude-skills-root	logs
-skipset	claude-skills-root	backups
-skipset	claude-skills-root	cache
-skipset	claude-skills-root	caches
-skipset	claude-skills-root	tmp
-skipset	claude-skills-root	*.log
-skipset	claude-skills-root	*.db
-skipset	claude-skills-root	*.sqlite
-skipset	claude-skills-root	*.sqlite-wal
-skipset	claude-skills-root	*.sqlite-shm
+skipset-include	claude-skills-root	common-runtime
 
 # .codex root: local runtime state.
+skipset-include	codex-root	common-runtime
+skipset-include	codex-root	credential-state
+skipset-include	codex-root	plugin-state
 skipset	codex-root	auth.json
 skipset	codex-root	sessions
-skipset	codex-root	logs
-skipset	codex-root	backups
 skipset	codex-root	git-hooks
 skipset	codex-root	ecc-install-state.json
 skipset	codex-root	dotfiles-*-sync-state.json
 skipset	codex-root	history.jsonl
-skipset	codex-root	cache
-skipset	codex-root	caches
-skipset	codex-root	tmp
-skipset	codex-root	plugins
-skipset	codex-root	plugin-cache
-skipset	codex-root	.credentials.json
-skipset	codex-root	credentials.json
-skipset	codex-root	config.json
-skipset	codex-root	models_cache.json
-skipset	codex-root	session_index.jsonl
-skipset	codex-root	*.log
-skipset	codex-root	*.db
-skipset	codex-root	*.sqlite
-skipset	codex-root	*.sqlite-wal
-skipset	codex-root	*.sqlite-shm
 
 # .agents root: local runtime state.
-skipset	agents-root	logs
-skipset	agents-root	backups
-skipset	agents-root	cache
-skipset	agents-root	caches
-skipset	agents-root	tmp
-skipset	agents-root	plugins
-skipset	agents-root	plugin-cache
+skipset-include	agents-root	common-runtime
+skipset-include	agents-root	credential-state
+skipset-include	agents-root	plugin-state
 skipset	agents-root	sessions
-skipset	agents-root	.credentials.json
-skipset	agents-root	credentials.json
-skipset	agents-root	config.json
-skipset	agents-root	models_cache.json
-skipset	agents-root	session_index.jsonl
-skipset	agents-root	*.log
-skipset	agents-root	*.db
-skipset	agents-root	*.sqlite
-skipset	agents-root	*.sqlite-wal
-skipset	agents-root	*.sqlite-shm

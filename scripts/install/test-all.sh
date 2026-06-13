@@ -11,6 +11,7 @@ SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 DOTPATH=${DOTPATH:-$(cd "$SCRIPT_DIR/../.." && pwd)}
 BRANCH=${DOTFILES_BRANCH:-}
 VERBOSE=0
+RUN_LINT=1
 PROFILE_INPUTS=()
 
 INSTALL_LIB_DIR="$DOTPATH/scripts/install/lib"
@@ -20,6 +21,7 @@ for lib in common profile; do
         echo "Error: missing installer library: $lib_path" >&2
         exit 1
     fi
+    # shellcheck disable=SC1090 # lib_path is validated from INSTALL_LIB_DIR at runtime.
     . "$lib_path"
 done
 
@@ -28,6 +30,7 @@ usage() {
 Usage: bash scripts/install/test-all.sh [--verbose|-v] [--branch <branch>] [--profile profiles/<name>]
 
 Options:
+  --no-lint         Skip shellcheck lint.
   --profile <dir>    Run this profile smoke test instead of discovering active profiles.
                      May be passed multiple times.
   --branch <branch>  Branch name used for active profile discovery and profile smoke tests.
@@ -38,6 +41,9 @@ USAGE
 
 while [ "$#" -gt 0 ]; do
     case "$1" in
+        --no-lint)
+            RUN_LINT=0
+            ;;
         --profile)
             if [ "$#" -lt 2 ]; then
                 echo "Error: --profile requires a value" >&2
@@ -127,6 +133,14 @@ run_installer_regression() {
     bash "$DOTPATH/scripts/install/test-installer.sh" "${args[@]}"
 }
 
+run_lint() {
+    local args=()
+
+    [ "$VERBOSE" -eq 1 ] && args+=(--verbose)
+    log "Run shell lint"
+    bash "$DOTPATH/scripts/install/lint.sh" "${args[@]}"
+}
+
 run_profile_smoke_test() {
     local profile_dir="$1"
     local wrapper="$profile_dir/bin/test-profile.sh"
@@ -159,6 +173,12 @@ main() {
         log "Branch: $BRANCH"
     else
         log "Branch: <not detected>"
+    fi
+
+    if [ "$RUN_LINT" -eq 1 ]; then
+        run_lint || rc=1
+    else
+        log "Skip shell lint"
     fi
 
     run_installer_regression || rc=1
