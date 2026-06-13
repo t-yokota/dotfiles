@@ -66,7 +66,7 @@ archive/   旧 .bashrc / .inputrc
 8. **docs/ の索引・規約不在**: docs index がなく、`Last reviewed` 規約も暗黙。installer 開発者向けガイド (テストの増やし方・bash 規約) が存在しない。
 9. **detached HEAD 時の silent skip**: `get_current_branch` が空を返すと profile 読み込みが無言で skip される。
 10. **top-level dotfiles の鮮度**: `.zshrc` は oh-my-zsh stock template のコメントが大半 (148 行中実効 32 行)。
-11. **単一 working tree の二役問題**: `~/dotfiles` が「HOME symlink の実体」と「branch を切り替える編集場所」を兼ねるため、`main` へ checkout すると適用中 profile の symlink が dangling になり、その状態で `install.sh` を実行すると prune される。対策として**案A (作業用 worktree 分離) を本計画の正式運用とする** (F6)。`main` などでの作業は `git worktree` で repo 外の作業 directory に出し、`~/dotfiles` 本体は適用中 profile branch に常駐させる。将来の構造的解決 (案B: deploy worktree) は F7 で設計する。
+11. **単一 working tree の二役問題**: `~/dotfiles` が「HOME symlink の実体」と「branch を切り替える編集場所」を兼ねるため、`main` へ checkout すると適用中 profile の symlink が dangling になり、その状態で `install.sh` を実行すると prune される。対策として**案A (作業用 worktree 分離) を本計画の正式運用とする** (F6)。`main` などでの作業は `git worktree` で repo 外の作業 directory に出し、`~/dotfiles` 本体は適用中 profile branch に常駐させる。リファクタリングを各 branch へ反映した後の次 task は、構造的解決としての案B (deploy worktree) への移行とする。
 
 ## 実行規則 (全 task 共通)
 
@@ -88,6 +88,7 @@ archive/   旧 .bashrc / .inputrc
 ### branch 配置と worktree 運用 (案A)
 
 - 共通 installer (`install.sh`, `scripts/install/`)・共通 docs・top-level dotfiles の変更は **`main` に commit** し、`profile/ecc-base` → `profile/ecc/*` へ merge で降ろす。
+- profile branch の考え方、managed root / surface / manifest schema の説明、installer 開発 guide、worktree 運用、改善計画は **`main` で理解できる共通 docs** として管理する。具体的な ECC profile 資産や ECC 専用手順は `profile/ecc-base` に置く。
 - ECC profile 資産 (`profiles/ecc/`) の変更は **`profile/ecc-base`** に commit する。
 - 環境固有の生成物 (`.claude/` 配下の ECC output 更新など) は **`profile/ecc/*`** のみ。
 - この improvement-plan 自体も共通 docs なので、最終的には `main` に置く。
@@ -114,5 +115,6 @@ archive/   旧 .bashrc / .inputrc
 2. **Phase 1 — コードリファクタリング**: テストが緑のうちに entrypoint 重複・logging 副作用・dry-run/verbose 結合・テスト分割を解消する。
 3. **Phase 2 — manifest schema 進化**: skipset 共通化と surface 定義の簡素化。振る舞い変更を含むため Phase 1 完了後。
 4. **Phase 3 — ドキュメント再構成**: schema が確定した後に README 分割・reference 整備・developer guide 作成を行う (二度書きを避ける)。
-5. **Phase 4 — 機能拡張**: 既存 Future Work (Claude/Codex 選択適用、main↔profile 同期補助) と新規機能 (profile scaffolding)。F2 の運用経験を入力として、案B (deploy worktree) への移行設計を F7 で行う (設計のみ。実装可否はその時点で判断)。
-6. **Phase 5 — 周辺整理**: top-level dotfiles の刷新、archive 整理、ECC upstream 更新チェック。
+5. **Phase 4 — branch 反映と案B移行**: リファクタリングがローカルで問題ないことを確認し、`main` / `profile/ecc-base` / leaf branch へ適切に反映する。その後の次 task は案B (deploy worktree) への移行。
+6. **Phase 5 — 機能拡張**: 既存 Future Work (Claude/Codex 選択適用、main↔profile 同期補助) と新規機能 (profile scaffolding)。
+7. **Phase 6 — 周辺整理**: top-level dotfiles の刷新、archive 整理、ECC upstream 更新チェック。

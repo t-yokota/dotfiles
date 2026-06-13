@@ -1,6 +1,6 @@
 # 実装タスク再計画 (Roadmap)
 
-- Last reviewed: 2026-06-11
+- Last reviewed: 2026-06-14
 - 前提: [README.md](README.md) の実行規則、[01-documentation.md](01-documentation.md)、[02-refactoring.md](02-refactoring.md)
 
 この計画書は、リファクタリング (R-tasks)・ドキュメント (D-tasks)・機能拡張 (F-tasks) を依存関係順に統合した実行 roadmap です。top-level README の旧「Future Work」(ECC profile の Claude/Codex 選択適用、main↔profile 同期補助) は F1 / F2 としてここに吸収します。
@@ -12,14 +12,16 @@ Phase 0  ガード整備            F6 worktree運用 → R5 lint → R6 CI → 
 Phase 1  振る舞い非変更リファクタ R1 → R2 → R3 → R11 → R7 (並行可: R9, R10) (任意: R4)
 Phase 2  manifest schema 進化   R8
 Phase 3  ドキュメント再構成      D3 → D2 → D5 → D4 → D6
-Phase 4  機能拡張              F1 → F3 → F2 → F7 (案B 移行設計)
-Phase 5  周辺整理              F4, F5, D7 (計画文書の archive)
+Phase 4  branch反映と案B移行   main/profile/ecc-base反映 → F7 (案B 移行)
+Phase 5  機能拡張              F1 → F3 → F2
+Phase 6  周辺整理              F4, F5, D7 (計画文書の archive)
 ```
 
 原則:
 
 - **Phase 0 を最初に完了させる。** 以後のすべての変更が CI で守られる。特に F6 (worktree 運用) は最初に確立する: 本計画の commit の多くは `main` 宛てであり、F6 なしで `~/dotfiles` 本体を `main` へ checkout すると適用中 profile の runtime surface が壊れる (詳細は F6 の背景を参照)。
-- **branch 切り替えの運用は案A (作業用 worktree 分離) を正とする。** `~/dotfiles` 本体は適用中の profile branch に常駐させ、`main` などでの作業は worktree で行う。案B (deploy worktree) は F7 で設計のみ行い、実装可否は F7 完了時に判断する。
+- **branch 切り替えの運用は案A (作業用 worktree 分離) を現在の正とする。** `~/dotfiles` 本体は適用中の profile branch に常駐させ、`main` などでの作業は worktree で行う。リファクタリングが問題ないことを確認し、内容を `main` / `profile/ecc-base` / leaf branch へ反映したら、次 task は案B (deploy worktree) への移行とする。
+- **profile の考え方は `main` でも理解できる状態にする。** `main` は concrete な ECC profile 資産を持たなくても、dotfiles の思想、profile branch 戦略、managed root / surface / manifest schema、worktree 運用、installer 開発規約を共通 docs として持つ。ECC 固有の manifest・manual・生成物は `profile/ecc-base` 以降で管理する。
 - Phase 1 の R1→R2→R3 は順序依存。R7 は R1〜R3 と独立だが、R8 より先に終えること (R8 はテスト追加を前提とするため)。
 - Phase 3 は Phase 2 完了後に行う (schema reference の二度書き防止)。ただし D1 (索引) と D3 (developer guide) の骨子は先行してよい。
 - 各 Phase 完了時に `bash scripts/install/test-all.sh` 全 PASS + CI green + 実 HOME での `bash install.sh --dry-run` / `bash status.sh` 無異常を確認してから次へ進む。
@@ -46,13 +48,13 @@ Phase 5  周辺整理              F4, F5, D7 (計画文書の archive)
 | D5 | status 分類 reference | 3 | 中 | 小 | - | - |
 | D4 | manual-install の lifecycle 分離 | 3 | 中 | 中 | - | - |
 | D6 | README スリム化・roadmap 分離 | 3 | 中 | 小 | D2,D5 | - |
-| F1 | ECC profile: Claude / Codex 選択適用 | 4 | 高 | 中 | Phase 1 完了 | あり |
-| F3 | profile scaffolding script | 4 | 中 | 中 | R8,D2 | なし (新規追加) |
-| F2 | main ↔ profile branch 同期補助 | 4 | 中 | 大 | - | なし (新規追加) |
-| F7 | deploy worktree (案B) への移行設計 | 4 | 中 | 中 | F2, F6 | なし (設計のみ) |
-| F4 | ECC upstream 更新チェック helper | 5 | 低 | 中 | D4 | なし (新規追加) |
-| F5 | top-level dotfiles 刷新 | 5 | 低 | 小 | - | あり (shell 設定) |
-| D7 | 計画文書の保守・archive | 5 | 低 | 小 | 全完了 | - |
+| F7 | deploy worktree (案B) への移行 | 4 | 最高 | 大 | branch反映完了,F6 | あり (適用構造変更) |
+| F1 | ECC profile: Claude / Codex 選択適用 | 5 | 高 | 中 | Phase 4 完了 | あり |
+| F3 | profile scaffolding script | 5 | 中 | 中 | R8,D2 | なし (新規追加) |
+| F2 | main ↔ profile branch 同期補助 | 5 | 中 | 大 | Phase 4 完了 | なし (新規追加) |
+| F4 | ECC upstream 更新チェック helper | 6 | 低 | 中 | D4 | なし (新規追加) |
+| F5 | top-level dotfiles 刷新 | 6 | 低 | 小 | - | あり (shell 設定) |
+| D7 | 計画文書の保守・archive | 6 | 低 | 小 | 全完了 | - |
 
 R / D task の詳細指示は各計画書を参照。以下は F-task の詳細指示書です。
 
@@ -109,7 +111,7 @@ worktree 作成・掃除の補助 script (`scripts/worktree/`) は本 task で�
 
 ## F1: ECC profile — Claude / Codex の選択適用
 
-- Phase 4 / 優先度: 高 / 工数: 中 / 依存: Phase 1 完了 (テスト分割済みだと case 追加が容易)
+- Phase 5 / 優先度: 高 / 工数: 中 / 依存: Phase 4 完了 (テスト分割済みだと case 追加が容易)
 - 対象: `profiles/ecc/checks.d/10-local-state.sh`, `profiles/ecc/bin/check-local-state.sh`, `docs/ecc-dotfiles-manual-install.md`, テスト
 
 ### 目的 (旧 Future Work 1)
@@ -150,7 +152,7 @@ worktree 作成・掃除の補助 script (`scripts/worktree/`) は本 task で�
 
 ## F3: profile scaffolding script
 
-- Phase 4 / 優先度: 中 / 工数: 中 / 依存: R8 (最終 schema 確定後), D2
+- Phase 5 / 優先度: 中 / 工数: 中 / 依存: R8 (最終 schema 確定後), D2
 - 対象: `scripts/profile/new-profile.sh` (新規), README / docs
 
 ### 目的
@@ -177,7 +179,7 @@ README「Branch Strategy」に書かれた「既存 profile を元に別 profile
 
 ## F2: main ↔ profile branch 同期補助
 
-- Phase 4 / 優先度: 中 / 工数: 大 (設計を含む) / 依存: なし
+- Phase 5 / 優先度: 中 / 工数: 大 (設計を含む) / 依存: Phase 4 完了
 - 対象: `scripts/profile/sync-status.sh` (新規, read-only) ほか
 
 ### 目的 (旧 Future Work 2)
@@ -206,15 +208,17 @@ README「Branch Strategy」に書かれた「既存 profile を元に別 profile
 
 ---
 
-## F7: deploy worktree (案B) への移行設計
+## F7: deploy worktree (案B) への移行
 
-- Phase 4 / 優先度: 中 / 工数: 中 / 依存: F2 (同期補助の運用経験を設計入力にするため F2 の後), F6
-- 対象: `docs/improvement-plan/design/deploy-worktree.md` (新規・設計文書のみ)
-- **この task の成果物は設計文書と移行計画であり、実装は含まない。** 実装可否は設計完了時に判断し、実装する場合は新 task として起案する。
+- Phase 4 / 優先度: 最高 / 工数: 大 / 依存: リファクタリング反映完了, F6
+- 対象: `docs/improvement-plan/design/deploy-worktree.md` (新規), installer / deploy entrypoint, tests, README / docs
+- この task は、設計文書を先に作り、検証可能な移行手順に落としてから案Bへ移行する。設計で重大な阻害要因が見つかった場合のみ中止判断を記録する。
 
 ### 目的
 
-案A (F6) は「本体 checkout を適用 branch に常駐させる」という運用規約で課題を回避するが、規約違反 (本体での checkout 切り替え) に対する構造的な防御はない。案B は HOME の symlink が指す先を**適用専用 worktree** (例: `~/.dotfiles-active`) に固定し、編集 (本体はどの branch でも自由) と適用 (専用 worktree を意図的に切り替える deploy 操作) を構造的に分離する。F2 / F6 の運用経験を踏まえ、移行する価値があるか、するならどう移行するかを設計する。
+案A (F6) は「本体 checkout を適用 branch に常駐させる」という運用規約で課題を回避するが、規約違反 (本体での checkout 切り替え) に対する構造的な防御はない。案B は HOME の symlink が指す先を**適用専用 worktree** (例: `~/.dotfiles-active`) に固定し、編集 (本体はどの branch でも自由) と適用 (専用 worktree を意図的に切り替える deploy 操作) を構造的に分離する。
+
+リファクタリングが問題ないことをローカル検証と CI で確認し、共通内容を `main`、profile 内容を `profile/ecc-base`、環境固有内容を leaf branch へ反映したら、この案B移行を次 task とする。
 
 ### 設計文書に含めるべき項目 (チェックリスト)
 
@@ -233,22 +237,26 @@ README「Branch Strategy」に書かれた「既存 profile を元に別 profile
 
 ### 作業手順
 
-1. F6 / F2 の実施記録を読み、案A 運用で観測された問題を収集する。
+1. F6 と branch 反映作業の実施記録を読み、案A 運用で観測された問題を収集する。
 2. 上記チェックリストに沿って `docs/improvement-plan/design/deploy-worktree.md` を書く。
-3. 移行判断 (実装する / しない / 保留) を文書末尾に記録し、実装する場合は新 task 群 (実装・テスト・docs 更新・移行実施) を 03-roadmap に起案して追記する。
+3. 移行判断 (実装する / 中止する / 保留) を文書末尾に記録する。中止以外なら、同じ task 内で実装・テスト・docs 更新・実 HOME 移行手順を進める。
+4. deploy 操作の実装を行う場合は、先に regression test を追加し、旧 link (`~/dotfiles` target) と新 link (適用専用 worktree target) が混在する移行期を安全に扱えることを確認する。
+5. 実 HOME の移行は dry-run / status / rollback 手順を通した後に行う。移行後は新しい zsh session / Codex / Claude の実利用に必要な symlink が欠けていないことを確認する。
 
 ### 受け入れ基準
 
 - [ ] 設計文書がチェックリスト 10 項目をすべて扱っている。
 - [ ] 移行手順と rollback 手順が段階ごとの検証コマンド付きで書かれている。
 - [ ] 実装可否の判断とその根拠が記録されている。
-- [ ] コード・HOME への変更が一切ない (設計のみ)。
+- [ ] 実装する場合、案B の deploy 操作と migration regression test が追加されている。
+- [ ] 実 HOME の managed symlink が適用専用 worktree を指し、`bash status.sh` が missing / conflicts / stale / orphaned 0 を報告する。
+- [ ] rollback 手順が実行可能であることを dry-run または fixture で確認済み。
 
 ---
 
 ## F4: ECC upstream 更新チェック helper
 
-- Phase 5 / 優先度: 低 / 工数: 中 / 依存: D4 (lifecycle 文書)
+- Phase 6 / 優先度: 低 / 工数: 中 / 依存: D4 (lifecycle 文書)
 - 対象: `profiles/ecc/bin/check-upstream.sh` (新規)
 
 ### 目的
@@ -270,7 +278,7 @@ ECC repo (`$ECC_REPO`) の version と、dotfiles 側に取り込み済みの生
 
 ## F5: top-level dotfiles 刷新
 
-- Phase 5 / 優先度: 低 / 工数: 小 / 依存: なし / 注意: shell 環境の振る舞いが変わるため実機確認必須
+- Phase 6 / 優先度: 低 / 工数: 小 / 依存: なし / 注意: shell 環境の振る舞いが変わるため実機確認必須
 - 対象: `.zshrc`, `archive/`
 
 ### 目的
@@ -296,7 +304,7 @@ ECC repo (`$ECC_REPO`) の version と、dotfiles 側に取り込み済みの生
 
 1. 全 task が完了 or 「見送り」判断とその理由が実施記録に残っている。
 2. CI が `main` / `profile/ecc-base` で green。
-3. 案A の worktree 運用が docs 化され、計画期間中の `main` 宛て commit がすべて worktree 経由で行われている (適用中 profile の HOME symlink が編集作業によって壊れた記録がない)。F7 の設計文書が存在し、案B の実装可否判断が記録されている。
+3. 案A の worktree 運用が docs 化され、計画期間中の `main` 宛て commit がすべて worktree 経由で行われている (適用中 profile の HOME symlink が編集作業によって壊れた記録がない)。その後 F7 で案B への移行が完了し、適用専用 worktree を指す HOME symlink が `bash status.sh` で正常確認されている。
 4. README が 200 行以下で、docs 索引から全文書に到達できる。
 5. `bash scripts/install/test-all.sh` 全 PASS、test case 数が baseline (31) 以上。
 6. この improvement-plan が D7 に従い archive されている。
