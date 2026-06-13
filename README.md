@@ -20,6 +20,8 @@ profile/<name>/<environment>
 
 `*-base` branch は profile の共通構造と手順を置くための branch です。できるだけ portable に保ちます。local path を含む生成物や machine-local な sync marker が必要な場合は、base branch から環境別 branch を切って、その branch で tool installer を実行します。<br>たとえば ECC profile では、`profile/ecc-base` に installer 連携や手順を置き、実際の Claude / Codex 生成物や local sync marker は `profile/ecc/<environment>` 側で管理します。
 
+`~/dotfiles` 本体は、実 HOME に適用中の profile branch に常駐させます。`main` や `profile/ecc-base` の編集・commit 作業は repo 外の `git worktree` で行い、`DOTPATH` を worktree に向けて `install.sh` を実行しません。共通資産を適用環境へ取り込むときは、本体 checkout を適用 branch に乗せたまま merge し、必要に応じて `bash install.sh` を再実行します。詳しい手順と復旧方法は [docs/worktree-workflow.md](docs/worktree-workflow.md) を参照します。
+
 既存 profile を元に別 profile を作る場合は、`profiles/<name>/` を profile の資産として一式コピーします。`profile.tsv`, `surfaces.tsv`, `skipsets.tsv`, `checks.d/` だけでなく、`bin/` に置いた profile-local な補助 script や smoke test も移植対象です。移植後は `profile.tsv` の branch pattern を新しい profile 名に合わせ、`bash profiles/<name>/bin/test-profile.sh --branch profile/<name>-base` で profile が単独で適用可能か確認します。
 
 ## Repository Layout
@@ -67,7 +69,7 @@ profile/<name>/<environment>
 - `scripts/install/test-profile.sh`: profile smoke test の共通 runner です。指定した `profiles/<name>/` を一時 HOME に適用し、profile manifest と surface の基本動作を確認します。
 - `profiles/<name>/`: profile branch 固有の定義です。surface、skipset、branch-specific check、profile 補助 script、profile-local smoke test wrapper をここに置きます。
 - `.claude/`, `.codex/`, `.agents/`: managed root です。root directory ごと symlink するのではなく、profile manifest の surface 定義に従って、配下の desired state だけを HOME に出します。
-- `docs/`: profile の背景、手順、外部 tool との対応関係など、README に収めない長めの補足を置きます。
+- `docs/`: profile の背景、手順、外部 tool との対応関係など、README に収めない長めの補足を置きます。索引は [docs/README.md](docs/README.md) です。
 
 ## Install
 
@@ -78,10 +80,11 @@ cd ~/dotfiles
 bash install.sh
 ```
 
-実際に symlink を作る前に確認したい場合は、`--dry-run` または短縮形の `-n` を使います。<br>profile manifest、branch-specific check、cleanup 対象、link conflict、作成予定の symlink を確認しますが、共通 installer は directory 作成、symlink 作成、cleanup を書き込みません。
+実際に symlink を作る前に確認したい場合は、`--dry-run` または短縮形の `-n` を使います。<br>profile manifest、branch-specific check、cleanup 対象、link conflict、作成予定件数を確認しますが、共通 installer は directory 作成、symlink 作成、cleanup を書き込みません。個々の path まで確認したい場合は `--verbose` を併用します。
 
 ```bash
 bash install.sh --dry-run
+bash install.sh --dry-run --verbose
 bash install.sh --verbose
 bash install.sh --help
 ```
@@ -90,11 +93,12 @@ bash install.sh --help
 
 ```bash
 bash uninstall.sh --dry-run
+bash uninstall.sh --dry-run --verbose
 bash uninstall.sh --verbose
 bash uninstall.sh
 ```
 
-`install.sh` / `uninstall.sh` の通常表示は phase ごとの OK と Result が中心です。link / remove / skip の件数は section ごとの OK と最後の Result に表示されます。link / remove / skip 単位の詳細ログを確認したい場合は、`--verbose` または短縮形の `-v` を使います。`--dry-run` の場合は、書き込み予定を確認するために詳細ログも表示します。
+`install.sh` / `uninstall.sh` の通常表示は phase ごとの OK と Result が中心です。link / remove / skip の件数は section ごとの OK と最後の Result に表示されます。link / remove / skip 単位の詳細ログを確認したい場合は、`--verbose` または短縮形の `-v` を使います。`--dry-run` 単体では件数 summary を表示し、`--dry-run --verbose` では個々の予定 path も表示します。
 
 現在の link 状況を確認したい場合は、`status.sh` を使います。`status.sh` は read-only で、実 HOME へ書き込みません。通常表示では section ごとの件数と Result を表示し、missing / conflict / stale / orphaned がある場合は `Check:` として示します。個別の path まで確認したい場合は、`--verbose` または短縮形の `-v` を使います。
 
@@ -150,6 +154,7 @@ bash profiles/ecc/bin/test-profile.sh
 
 1. **Preflight**:
    checkout している branch に対応する profile manifest を読み込み、branch 固有の check 処理を行います。
+   detached HEAD などで branch 名を検出できない場合は警告を出し、profile なしの install として続行します。
 2. **Cleanup**:
    この dotfiles checkout を指している古い symlink だけを削除します。通常ファイルや別の場所を指す symlink は削除しません。
 3. **Link Conflict Check**:
@@ -165,6 +170,7 @@ bash profiles/ecc/bin/test-profile.sh
 
 ```text
 .git
+.github
 .gitignore
 .gitconfig.local
 .claude
@@ -172,7 +178,7 @@ bash profiles/ecc/bin/test-profile.sh
 .agents
 ```
 
-`.gitconfig.local` は環境ごとの machine-local 設定です。tracked な `.gitconfig` から include しますが、`install.sh` では作成も symlink もしません。<br>`.claude`, `.codex`, `.agents` は managed root として扱い、profile が有効な場合だけ managed surface 定義に従って entry 単位または package 単位で symlink します。profile がない branch でも、root directory ごと HOME に symlink することはありません。
+`.github` は repository / CI 用、`.gitconfig.local` は環境ごとの machine-local 設定です。tracked な `.gitconfig` から include しますが、`install.sh` では作成も symlink もしません。<br>`.claude`, `.codex`, `.agents` は managed root として扱い、profile が有効な場合だけ managed surface 定義に従って entry 単位または package 単位で symlink します。profile がない branch でも、root directory ごと HOME に symlink することはありません。
 
 ## Managed Dotfile Surfaces
 
@@ -221,44 +227,16 @@ profiles/<name>/skipsets.tsv
 
 ### Profile Manifest Schema
 
-manifest は tab 区切りの TSV です。空行と `#` で始まる行は無視されます。余分な列がある行は invalid として扱います。
-
-`profile.tsv` は、profile が有効になる branch pattern と、関連 manifest の場所を定義します。
+manifest schema の詳細は [docs/reference/profile-manifest.md](docs/reference/profile-manifest.md) に分離しています。ここでは profile を読む時の最小構造だけを示します。
 
 ```text
-branch	<branch-pattern>
-surfaces	<profile-relative-path>
-skipsets	<profile-relative-path>
-checks	<profile-relative-path>
+profile.tsv    branch pattern と関連 manifest path
+surfaces.tsv   DOTPATH 側 desired state を HOME へ出す surface 定義
+skipsets.tsv   entries surface で除外する entry 名 pattern と include 定義
+checks.d/      profile branch 適用前に走る branch-specific check
 ```
 
-- `branch`: 現在の branch に対する glob pattern です。例: `profile/ecc-base`, `profile/ecc/*`
-- `surfaces`: surface 定義 file です。省略時は `surfaces.tsv` です。
-- `skipsets`: skipset 定義 file です。省略時は `skipsets.tsv` です。
-- `checks`: branch-specific check directory です。省略時は `checks.d` です。
-
-`branch` は複数行書けます。`surfaces`, `skipsets`, `checks` は省略可能ですが、それぞれ1回までです。重複して書いた場合は invalid として扱います。
-
-`surfaces.tsv` は、dotfiles 側の desired state を HOME 側にどの粒度で出すかを定義します。
-
-```text
-surface	entries|whole	<source>	<dest>	<skipset-name|none>	<label>
-```
-
-- `entries`: `<source>` directory の entry を `<dest>` directory 内へ個別に symlink します。
-- `whole`: `<source>` の file / directory 自体を `<dest>` へ symlink します。
-- `<source>` は dotfiles checkout からの path、`<dest>` は HOME からの path として解決します。どちらも相対 path として書き、絶対 path や `..` を含む path は invalid として扱います。
-- `<source>` と `<dest>` の root は managed root である必要があります。現在は `.claude`, `.codex`, `.agents` 配下だけを managed surface として扱います。
-- `<skipset-name>` は `skipsets.tsv` に定義された名前、または skip しない場合の `none` です。
-- `<label>` は install log に出す説明です。space は使えますが、tab は列区切りとして扱います。
-
-`skipsets.tsv` は、`entries` surface で link 対象から外す entry 名 pattern を定義します。
-
-```text
-skipset	<name>	<pattern>
-```
-
-`<name>` は `surfaces.tsv` から参照する skipset 名です。`<pattern>` は directory 内の entry 名に対する shell glob pattern です。例: `sessions`, `*.log`, `dotfiles-*-sync-state.json`
+`skipsets.tsv` では `skipset	<name>	<pattern>` に加えて、`skipset-include	<name>	<include-name>` で共通 pattern 群を合成できます。include 先は前方参照できず、自己 include・循環 include・重複 include は invalid です。
 
 ## Branch-Specific Checks
 

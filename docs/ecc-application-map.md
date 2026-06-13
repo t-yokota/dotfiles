@@ -1,6 +1,6 @@
 # ECC Application Map for Claude Code and Codex
 
-Last reviewed: 2026-05-30
+- Last reviewed: 2026-06-13
 
 このメモは、Everything Claude Code (ECC) を Claude Code と Codex に適用するときに、何がどこへ配置され、各エージェントがどこから読むのかを整理するためのものです。
 

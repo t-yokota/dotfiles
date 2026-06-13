@@ -18,6 +18,18 @@
 
 **実施順の注意**: D2 (schema reference) は Phase 2 の manifest schema 変更 (R8) と密結合です。R8 を実施する場合は R8 完了後に D2 を書くこと。R8 を見送る場合は現行 schema で書いてよい。それ以外の D-task は独立して着手可能です。
 
+## 実施記録 (2026-06-14)
+
+commit hash は未作成です。最終 commit 作成時に D7 の規則に従って追記します。
+
+| Task | 状態 | 証跡 |
+|---|---|---|
+| D1 | 完了 | `docs/README.md` を追加し、docs index、鮮度規約、由来規約を明文化。 |
+| D2 | R8 連動更新済み | `docs/reference/profile-manifest.md` を追加し、R8 の `skipset-include` schema と manifest の主要規則を反映。D2 の詳細な error catalog / reference 完全化は Phase 3 の継続対象。 |
+| D3 | 完了 | `docs/development.md` を追加し、installer architecture、bash 規約、test 追加手順、変更チェックリストを文書化。 |
+
+---
+
 ## D1: docs 索引と鮮度規約の導入
 
 - 優先度: 高 / 工数: 小 / 依存: なし
@@ -44,9 +56,9 @@ docs/ に何があり、どれが手書きでどれが生成物由来か、い�
 
 ### 受け入れ基準
 
-- [ ] `docs/README.md` が存在し、docs 配下の全 `.md` (improvement-plan 含む) が表に載っている。
-- [ ] 鮮度規約と由来規約が明文化されている。
-- [ ] 全 docs の冒頭 3 行以内に `Last reviewed:` がある。
+- [x] `docs/README.md` が存在し、docs 配下の全 `.md` (improvement-plan 含む) が表に載っている。
+- [x] 鮮度規約と由来規約が明文化されている。
+- [x] 全 docs の冒頭 3 行以内に `Last reviewed:` がある。
 
 ### 検証
 
@@ -83,9 +95,9 @@ manifest の正確な仕様 (列定義・検証規則・エラー条件) を、R
 
 ### 受け入れ基準
 
-- [ ] reference に書かれた全規則が `profile.sh` の実装と一致する (実装に無い規則を書かない・実装にある規則を漏らさない)。
-- [ ] README の schema 節が概念説明 + リンクに縮小され、列定義の重複記載がない。
-- [ ] `bash scripts/install/test-all.sh` が全 PASS (コード変更はないが確認する)。
+- [x] reference に書かれた全規則が `profile.sh` の実装と一致する (実装に無い規則を書かない・実装にある規則を漏らさない)。
+- [x] README の schema 節が概念説明 + リンクに縮小され、列定義の重複記載がない。
+- [x] `bash scripts/install/test-all.sh` が全 PASS (コード変更はないが確認する)。
 
 ### 検証
 
@@ -113,8 +125,8 @@ installer 自体を変更する agent / 人間向けに、lib 構成・規約・
 
 ### 受け入れ基準
 
-- [ ] guide のみを読んだ状態で「新しい regression test case を 1 つ追加する」手順が一意に辿れる。
-- [ ] global state 一覧と lib 責務が実装と一致している。
+- [x] guide のみを読んだ状態で「新しい regression test case を 1 つ追加する」手順が一意に辿れる。
+- [x] global state 一覧と lib 責務が実装と一致している。
 
 ---
 
