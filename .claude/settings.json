@@ -1,6 +1,9 @@
 {
   "permissions": {
     "allow": [
+      "Read(**)",
+      "Edit(./**)",
+      "Write(./**)",
       "Bash(git *)",
       "Bash(ls *)",
       "Bash(find *)",
@@ -12,18 +15,9 @@
       "Bash(wc *)",
       "Bash(du *)",
       "Bash(command -v *)",
-      "Read(**)",
       "mcp__context7__*"
     ],
     "ask": [
-      "Bash(python3 *)",
-      "Bash(node *)",
-      "Bash(npx *)",
-      "Bash(npm run *)",
-      "Bash(npm test)",
-      "Bash(npm start)",
-      "Bash(pnpm run *)",
-      "Bash(yarn *)",
       "Bash(rm *)",
       "Bash(rmdir *)",
       "Bash(chmod *)",
@@ -36,10 +30,16 @@
       "Bash(git checkout*)",
       "Bash(git rebase*)",
       "Bash(git branch -D*)"
-    ]
+    ],
+    "defaultMode": "auto"
   },
-  "model": "opus[1m]",
+  "model": "opus",
+  "statusLine": {
+    "type": "command",
+    "command": "bun x ccusage statusline"
+  },
   "enabledPlugins": {
     "claude-code-setup@claude-plugins-official": true
-  }
+  },
+  "autoCompactEnabled": true
 }
