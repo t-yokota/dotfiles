@@ -103,6 +103,8 @@ profile smoke test だけを確認する場合は、profile 側の wrapper を�
 bash profiles/ecc/bin/test-profile.sh
 ```
 
+ECC profile の初回 setup は [docs/ecc-dotfiles-manual-install.md](docs/ecc-dotfiles-manual-install.md)、導入後の uninstall / regenerate / update / cleanup は [docs/ecc-dotfiles-lifecycle.md](docs/ecc-dotfiles-lifecycle.md) を参照します。
+
 ## Installer Flow
 
 `install.sh` は `DOTPATH=~/dotfiles` を起点に、現在 checkout されている branch の desired state を実 HOME に symlink します。通常ファイルを上書きせず、cleanup / uninstall はこの dotfiles checkout が作った symlink だけを対象にします。
