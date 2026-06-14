@@ -1,6 +1,6 @@
 # ECC Application Map for Claude Code and Codex
 
-- Last reviewed: 2026-06-13
+- Last reviewed: 2026-06-14
 
 このメモは、Everything Claude Code (ECC) を Claude Code と Codex に適用するときに、何がどこへ配置され、各エージェントがどこから読むのかを整理するためのものです。
 
@@ -171,7 +171,7 @@ Codex 公式ドキュメントでは、plugins は skills / MCP servers / apps /
 
 dotfiles で管理する場合は、ECC の出力をいったん `~/dotfiles` 配下に受け、その内容を `install.sh` で実 HOME の読み込み場所へ symlink します。Claude Code や Codex が読むのは実 HOME 側ですが、差分確認や再生成の基準は dotfiles 側に置きます。
 
-この節では、ECC の出力先と runtime の読み込み場所の対応だけを示します。導入手順、branch の作り方、commit / ignore、preflight、uninstall / regenerate は [ecc-dotfiles-manual-install.md](ecc-dotfiles-manual-install.md) を参照します。
+この節では、ECC の出力先と runtime の読み込み場所の対応だけを示します。導入手順、branch の作り方、commit / ignore、preflight は [ecc-dotfiles-manual-install.md](ecc-dotfiles-manual-install.md) を、uninstall / regenerate / update / cleanup は [ecc-dotfiles-lifecycle.md](ecc-dotfiles-lifecycle.md) を参照します。
 
 ```mermaid
 flowchart TD

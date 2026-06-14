@@ -10,9 +10,11 @@
 |---|---|---|---|
 | [ecc-application-map.md](ecc-application-map.md) | ECC が Claude Code / Codex へどの経路で配置されるかを整理した map。 | ECC profile を理解・更新する人 | 手書き |
 | [ecc-dotfiles-manual-install.md](ecc-dotfiles-manual-install.md) | ECC 出力を dotfiles 側に取り込み、実 HOME へ symlink する初回手順。 | 新しい環境で profile を適用する人 | 手書き |
+| [ecc-dotfiles-lifecycle.md](ecc-dotfiles-lifecycle.md) | ECC profile 導入後の uninstall / regenerate / update / cleanup 手順。 | ECC profile を運用・更新する人 | 手書き |
 | [development.md](development.md) | common installer の architecture、bash 規約、test 追加手順。 | installer を変更する人 / agent | 手書き |
 | [worktree-workflow.md](worktree-workflow.md) | `~/dotfiles` 本体を適用 branch に常駐させ、他 branch 作業を worktree で行う運用。 | 共通資産を編集する人 / agent | 手書き |
 | [reference/profile-manifest.md](reference/profile-manifest.md) | `profile.tsv`, `surfaces.tsv`, `skipsets.tsv`, `checks.d` の schema reference。 | profile を設計・変更する人 | 手書き |
+| [reference/status-classification.md](reference/status-classification.md) | `status.sh` の linked / missing / conflicts / stale / orphaned / skipped 分類。 | install 状態を診断する人 / agent | 手書き |
 | [improvement-plan/README.md](improvement-plan/README.md) | 改善計画全体の前提、実行規則、進め方。 | 改善作業を引き継ぐ agent / 人 | 計画文書 |
 | [improvement-plan/01-documentation.md](improvement-plan/01-documentation.md) | ドキュメント品質向上 task 群。 | docs を整備する agent / 人 | 計画文書 |
 | [improvement-plan/02-refactoring.md](improvement-plan/02-refactoring.md) | installer 一式のリファクタリング task 群。 | installer を変更する agent / 人 | 計画文書 |
