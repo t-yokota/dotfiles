@@ -27,6 +27,8 @@ commit hash は未作成です。最終 commit 作成時に D7 の規則に従�
 | D1 | 完了 | `docs/README.md` を追加し、docs index、鮮度規約、由来規約を明文化。 |
 | D2 | R8 連動更新済み | `docs/reference/profile-manifest.md` を追加し、R8 の `skipset-include` schema と manifest の主要規則を反映。D2 の詳細な error catalog / reference 完全化は Phase 3 の継続対象。 |
 | D3 | 完了 | `docs/development.md` を追加し、installer architecture、bash 規約、test 追加手順、変更チェックリストを文書化。 |
+| D5 | 完了 | `docs/reference/status-classification.md` を追加し、`status.sh` の 6 分類と対処方法を実装準拠で文書化。 |
+| D6 | 部分完了 | README を 143 行へ縮小し、詳細仕様を `docs/README.md` / reference / roadmap へ誘導。profile 専用 lifecycle 文書へのリンクは D4 実施後に profile branch 側で反映する。 |
 
 ---
 
@@ -175,8 +177,8 @@ installer 自体を変更する agent / 人間向けに、lib 構成・規約・
 
 ### 受け入れ基準
 
-- [ ] 6 分類すべてが実装準拠の条件で記載されている。
-- [ ] 各分類に対処方法が書かれている。
+- [x] 6 分類すべてが実装準拠の条件で記載されている。
+- [x] 各分類に対処方法が書かれている。
 
 ---
 
@@ -197,7 +199,7 @@ README を「概念 + quickstart + 各文書への入口」に絞る。
 
 ### 受け入れ基準
 
-- [ ] README が 200 行以下になる。
+- [x] README が 200 行以下になる。
 - [ ] README から docs/README.md・reference 群・lifecycle 文書へすべてリンクが張られている。
 - [ ] 削除した情報はすべて移設先に存在する (消失なし)。
 
