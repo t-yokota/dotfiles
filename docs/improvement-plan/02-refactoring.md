@@ -18,7 +18,7 @@ commit hash は未作成です。最終 commit 作成時に D7 の規則に従�
 | Task | 状態 | 証跡 |
 |---|---|---|
 | R5 | 完了 | `scripts/install/lint.sh` を追加し、`test-all.sh` に lint phase と `--no-lint` を追加。`shellcheck 0.9.0` で `bash scripts/install/lint.sh --verbose` が PASS。 |
-| R6 | remote 部分確認 | `.github/workflows/verify.yml` を追加し、`workflow_dispatch` も有効化。matrix は `main` / `profile/ecc-base`。`main` / `profile/ecc-base` / leaf branch を origin へ push 済み。GitHub Actions run `27484468897` (`head_branch=main`) は success、job `Installer (main)` / `Installer (profile/ecc-base)` も success。API 確認時点で `head_branch=profile/ecc-base` / leaf の run は未発生のため、profile branch 自体の remote green は未確認。 |
+| R6 | 完了 | `.github/workflows/verify.yml` を追加し、`workflow_dispatch` も有効化。matrix は `main` / `profile/ecc-base`。`main` / `profile/ecc-base` / leaf branch を origin へ push 済み。GitHub Actions は `main` run `27485512188`、`profile/ecc-base` run `27485512237`、leaf run `27485512170` がいずれも success。 |
 | R1 | 完了 | `scripts/install/lib/cli.sh` を追加し、3 entrypoint の option parsing / bootstrap を共通化。 |
 | R2 | 完了 | `summary_scope_begin`, `summary_scope_delta`, `summary_scope_remove_ok` を追加し、entrypoint の before/after counter 重複を削除。 |
 | R3 | 完了 | `log_step` / `log_substep` から prefix 文字列による skip counter 副作用を削除し、`count_and_log_skip` へ明示化。`log_link` / `log_would_link` は action-specific counter helper として comment 付きで維持。 |
@@ -112,7 +112,7 @@ push / PR ごとに regression test と lint を自動実行する。remote は 
 - [x] `workflow_dispatch` が定義され、GitHub UI から manual run の入口を持つ。
 - [x] `main` への push で CI が走り green。
 - [x] `main` run の matrix job として `Installer (main)` / `Installer (profile/ecc-base)` が green。
-- [ ] `profile/ecc-base` を `head_branch` にした CI run が green。
+- [x] `profile/ecc-base` を `head_branch` にした CI run が green。
 - [x] CI 失敗時に lint と test のどちらで落ちたか log から判別できる。
 
 ---
