@@ -54,6 +54,16 @@ R7 の case 分類:
 - `bash status.sh`
 - `git diff --check`
 
+厳密出力比較メモ (2026-06-14):
+
+- baseline `329b74c` と current `37517d2` を同じ一時 worktree (`DOTPATH` 同一) で切り替え、`DOTFILES_BRANCH=main` と一時 `HOME` を指定して出力を比較した。
+- `bash status.sh` の通常出力は byte 一致。
+- `bash status.sh --help` は byte 一致。
+- `bash install.sh --help` / `bash uninstall.sh --help` は R11 で dry-run 説明文を意図的に変更しているため byte 一致しない。
+- `bash install.sh --dry-run` は R11 で非 verbose の個別 `Would create symlink:` 行を消しているため byte 一致しない。
+- `bash install.sh --dry-run --verbose` は R11 の mode 通知文言差を除き、path detail は維持されている。
+- detached HEAD で実行した場合は R9 の `Warn: current branch is unknown` が current 側だけに出るため、R1-R3 の非変更比較からは除外した。
+
 ---
 
 ## R5: shellcheck / lint の導入
