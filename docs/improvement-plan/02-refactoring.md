@@ -11,6 +11,51 @@
 - `bash install.sh --dry-run`, `bash uninstall.sh --dry-run`, `bash status.sh` の出力が変更前と一致する (振る舞い非変更 task の場合)。実行前に 3 コマンドの出力をファイルに保存し、実行後に diff を取ること。
 - shellcheck 警告を増やさない (R5 導入後)。
 
+## 実施記録 (2026-06-14)
+
+commit hash は未作成です。最終 commit 作成時に D7 の規則に従って追記します。
+
+| Task | 状態 | 証跡 |
+|---|---|---|
+| R5 | 完了 | `scripts/install/lint.sh` を追加し、`test-all.sh` に lint phase と `--no-lint` を追加。`shellcheck 0.9.0` で `bash scripts/install/lint.sh --verbose` が PASS。 |
+| R6 | ローカル完了 / remote 未確認 | `.github/workflows/verify.yml` を追加。matrix は `main` / `profile/ecc-base`。push は未実施のため remote Actions green は未確認。 |
+| R1 | 完了 | `scripts/install/lib/cli.sh` を追加し、3 entrypoint の option parsing / bootstrap を共通化。 |
+| R2 | 完了 | `summary_scope_begin`, `summary_scope_delta`, `summary_scope_remove_ok` を追加し、entrypoint の before/after counter 重複を削除。 |
+| R3 | 完了 | `log_step` / `log_substep` から prefix 文字列による skip counter 副作用を削除し、`count_and_log_skip` へ明示化。`log_link` / `log_would_link` は action-specific counter helper として comment 付きで維持。 |
+| R11 | 完了 | dry-run と verbose を分離。`--dry-run` 単体は summary 中心、`--dry-run --verbose` は個別 path を表示。README と tests 更新済み。 |
+| R7 | 完了 | `test-installer.sh` を `tests/harness.sh` と `tests/cases/*.sh` へ分割。`--case <glob>` 部分実行を追加。最大 file は `harness.sh` 355 行。 |
+| R8 | 完了 | `skipset-include` schema を追加し、ECC skipsets を 117 行から 65 行へ削減。旧新 skip 判定は現 checkout の managed-root entry 29 件で一致。 |
+| R9 | 完了 | detached HEAD / branch 不明時に警告を出し、profile なし install として続行する test を追加。 |
+| R10 | 完了 | `install.sh`, `uninstall.sh`, `status.sh` に `set -u` を追加し、`set -e` 不採用理由を comment 化。 |
+| R4 | 見送り完了 | R2/R3/R8/R5 shellcheck 対応後の `common.sh` は 449 行。R4 の基準「450 行を下回っているなら分割せず完了」に従い、`log.sh` 分離は行わない。 |
+
+R7 の case 分類:
+
+| Case file | 主な test |
+|---|---|
+| `10-install-basic.sh` | base profile entry、whole surface、child surface skip、shell theme、CRLF manifest、managed root top-level skip |
+| `20-profile-runner.sh` | check ordering、profile smoke runner、aggregate runner |
+| `30-reconcile.sh` | unmanaged conflict、stale symlink cleanup、inactive profile cleanup |
+| `40-output-uninstall.sh` | verbose output、uninstall、uninstall dry-run |
+| `50-status.sh` | status inventory、status verbose |
+| `60-manifest-validation.sh` | invalid manifest、surface validation、skipset include validation、detached HEAD warning |
+| `70-cli-dry-run.sh` | help、unknown option、install dry-run、dry-run conflict |
+
+最終確認で実行した代表コマンド:
+
+- `bash scripts/install/test-all.sh`
+- `bash scripts/install/test-all.sh --branch main`
+- `bash scripts/install/test-all.sh --branch profile/ecc-base`
+- `bash scripts/install/lint.sh --verbose`
+- `bash scripts/install/test-installer.sh --case '60-*'`
+- `bash scripts/install/test-installer.sh --case '*dry-run*'`
+- `bash install.sh --dry-run`
+- `bash uninstall.sh --dry-run`
+- `bash status.sh`
+- `git diff --check`
+
+---
+
 ## R5: shellcheck / lint の導入
 
 - 優先度: 最高 (他の全 R-task の前に実施) / 工数: 小〜中 / 依存: なし / 振る舞い: 非変更
@@ -36,9 +81,9 @@
 
 ### 受け入れ基準
 
-- [ ] `bash scripts/install/lint.sh` が exit 0。
-- [ ] 抑制 directive にはすべて理由 comment が付いている。
-- [ ] `test-all.sh` 経由で lint が実行される。
+- [x] `bash scripts/install/lint.sh` が exit 0。
+- [x] 抑制 directive にはすべて理由 comment が付いている。
+- [x] `test-all.sh` 経由で lint が実行される。
 
 ---
 
@@ -64,7 +109,7 @@ push / PR ごとに regression test と lint を自動実行する。remote は 
 ### 受け入れ基準
 
 - [ ] `main` と `profile/ecc-base` への push で CI が走り green。
-- [ ] CI 失敗時に lint と test のどちらで落ちたか log から判別できる。
+- [x] CI 失敗時に lint と test のどちらで落ちたか log から判別できる。
 
 ---
 
@@ -93,9 +138,9 @@ push / PR ごとに regression test と lint を自動実行する。remote は 
 
 ### 受け入れ基準
 
-- [ ] 3 entrypoint から重複した parsing loop が消えている。
+- [x] 3 entrypoint から重複した parsing loop が消えている。
 - [ ] `bash install.sh --help`, `bash uninstall.sh --help`, `bash status.sh --help` の出力が変更前と byte 一致。
-- [ ] test-all.sh 全 PASS。
+- [x] test-all.sh 全 PASS。
 
 ---
 
@@ -119,7 +164,7 @@ push / PR ごとに regression test と lint を自動実行する。remote は 
 
 ### 受け入れ基準
 
-- [ ] before/after counter 変数 (`cleanup_removed_before` など) が entrypoint から消えている。
+- [x] before/after counter 変数 (`cleanup_removed_before` など) が entrypoint から消えている。
 - [ ] 3 mode の出力が変更前と一致。test-all.sh 全 PASS。
 
 ---
@@ -143,7 +188,7 @@ push / PR ごとに regression test と lint を自動実行する。remote は 
 
 ### 受け入れ基準
 
-- [ ] log 関数内に文字列プレフィックス判定による counter 増加が存在しない。
+- [x] log 関数内に文字列プレフィックス判定による counter 増加が存在しない。
 - [ ] 全 mode で skip 件数・出力が変更前と一致。test-all.sh 全 PASS。
 
 ---
@@ -190,12 +235,12 @@ push / PR ごとに regression test と lint を自動実行する。remote は 
 
 ### 受け入れ基準
 
-- [ ] `-n` 単体で個別の Would / Skip 行が出ず、件数 summary と Result は従来どおり出る。
-- [ ] `-nv` の出力が変更前の `-n` と同等 (mode 通知の文言差を除く)。
-- [ ] `-v` と指定なしの出力は変更前と一致する。
-- [ ] dry-run 非 verbose でも conflict 検出・manifest validation error は従来どおり表示され停止する。
-- [ ] usage / README の dry-run 説明が新挙動と一致する。
-- [ ] test-all.sh 全 PASS (更新・追加 case 含む)。
+- [x] `-n` 単体で個別の Would / Skip 行が出ず、件数 summary と Result は従来どおり出る。
+- [x] `-nv` の出力が変更前の `-n` と同等 (mode 通知の文言差を除く)。
+- [x] `-v` と指定なしの出力は変更前と一致する。
+- [x] dry-run 非 verbose でも conflict 検出・manifest validation error は従来どおり表示され停止する。
+- [x] usage / README の dry-run 説明が新挙動と一致する。
+- [x] test-all.sh 全 PASS (更新・追加 case 含む)。
 
 ---
 
@@ -239,9 +284,9 @@ scripts/install/
 
 ### 受け入れ基準
 
-- [ ] 全 31 case が新構成で PASS し、case 名の出力が従来と対応付く。
-- [ ] `bash scripts/install/test-installer.sh --case '60-*'` のような部分実行ができる。
-- [ ] 単一 file が 400 行を超えない。
+- [x] 全 31 case が新構成で PASS し、case 名の出力が従来と対応付く。
+- [x] `bash scripts/install/test-installer.sh --case '60-*'` のような部分実行ができる。
+- [x] 単一 file が 400 行を超えない。
 
 ---
 
@@ -284,10 +329,10 @@ skipset	claude-root	projects
 
 ### 受け入れ基準
 
-- [ ] 新規 test case が GREEN、既存 31 case も PASS。
-- [ ] 旧新 manifest の skip 判定が全 entry で一致した証跡 (比較 script の出力) を実施記録に残す。
-- [ ] `skipsets.tsv` の行数が概ね半減する。
-- [ ] reference / README が新 schema を反映している。
+- [x] 新規 test case が GREEN、既存 31 case も PASS。
+- [x] 旧新 manifest の skip 判定が全 entry で一致した証跡 (比較 script の出力) を実施記録に残す。
+- [x] `skipsets.tsv` の行数が概ね半減する。
+- [x] reference / README が新 schema を反映している。
 
 ---
 
@@ -308,8 +353,8 @@ skipset	claude-root	projects
 
 ### 受け入れ基準
 
-- [ ] detached HEAD で警告が出て、install 自体は profile なしで完走する。
-- [ ] 新 test case GREEN、既存全 PASS。
+- [x] detached HEAD で警告が出て、install 自体は profile なしで完走する。
+- [x] 新 test case GREEN、既存全 PASS。
 
 ---
 
@@ -330,8 +375,8 @@ skipset	claude-root	projects
 
 ### 受け入れ基準
 
-- [ ] 全 entrypoint が `set -u` 下で全 test PASS。
-- [ ] `set -e` 不採用の理由が code comment 化されている。
+- [x] 全 entrypoint が `set -u` 下で全 test PASS。
+- [x] `set -e` 不採用の理由が code comment 化されている。
 
 ---
 
