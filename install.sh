@@ -5,12 +5,15 @@ if [ -z "${BASH_VERSION:-}" ]; then
     exit 1
 fi
 
+set -u
+# Do not use set -e: installer phases intentionally propagate errors with explicit || exit handling.
+
 usage() {
     cat <<'USAGE'
 Usage: bash install.sh [--dry-run|-n] [--verbose|-v]
 
 Options:
-  -n, --dry-run  Validate and show planned changes without writing them.
+  -n, --dry-run  Validate planned changes without writing them.
   -v, --verbose  Print detailed link, remove, and skip logs.
   -h, --help     Show this help.
 USAGE
@@ -19,47 +22,22 @@ USAGE
 INSTALL_DRY_RUN=0
 INSTALL_VERBOSE=0
 
-while [ "$#" -gt 0 ]; do
-    case "$1" in
-        -n|--dry-run)
-            INSTALL_DRY_RUN=1
-            ;;
-        -v|--verbose)
-            INSTALL_VERBOSE=1
-            ;;
-        -h|--help)
-            usage
-            exit 0
-            ;;
-        *)
-            echo "Error: unknown option: $1" >&2
-            usage >&2
-            exit 1
-            ;;
-    esac
-    shift
-done
-
 DOTPATH=${DOTPATH:-"$HOME/dotfiles"}
-OH_MY_ZSH_THEMES=${OH_MY_ZSH_THEMES:-"$HOME/.oh-my-zsh/themes"}
-
-cd "$DOTPATH" || { echo "Error: Could not cd to $DOTPATH"; exit 1; }
-
-# Include hidden managed entries such as .claude/.agents, and make empty globs disappear.
-shopt -s nullglob dotglob
-
 INSTALL_LIB_DIR="$DOTPATH/scripts/install/lib"
 COMMON_LIB="$INSTALL_LIB_DIR/common.sh"
 if [ ! -f "$COMMON_LIB" ]; then
     echo "Error: missing installer library: $COMMON_LIB" >&2
     exit 1
 fi
+# shellcheck source=scripts/install/lib/common.sh
 . "$COMMON_LIB"
-init_installer_state
-load_installer_libraries profile reconcile || exit 1
+# shellcheck source=scripts/install/lib/cli.sh
+. "$INSTALL_LIB_DIR/cli.sh"
+cli_parse_standard_options install "$@" || exit 1
+cli_bootstrap profile reconcile || exit 1
 
 log_mode_section \
-    "Dry-run mode: no symlink, directory, or cleanup changes will be written by the common installer" \
+    "Dry-run mode: no symlink, directory, or cleanup changes will be written by the common installer. Use --verbose to list each planned change." \
     "Verbose mode: detailed link, remove, and skip logs will be printed"
 
 log_section "Preflight"
@@ -70,21 +48,14 @@ run_active_profile_install_checks || exit 1
 log_ok "preflight passed"
 
 log_section "Cleanup"
-cleanup_removed_before=$INSTALL_SUMMARY_REMOVED
-cleanup_would_remove_before=$INSTALL_SUMMARY_WOULD_REMOVE
+summary_scope_begin
 log_step "Prune stale top-level symlinks"
 cleanup_root_symlinks || exit 1
 log_step "Prune stale managed dotfile surface symlinks"
 cleanup_all_managed_surfaces || exit 1
 log_step "Prune orphaned managed-root symlinks"
 cleanup_orphaned_managed_root_symlinks || exit 1
-cleanup_removed=$((INSTALL_SUMMARY_REMOVED - cleanup_removed_before))
-cleanup_would_remove=$((INSTALL_SUMMARY_WOULD_REMOVE - cleanup_would_remove_before))
-if is_dry_run; then
-    log_ok "cleanup checked (planned removals: $cleanup_would_remove)"
-else
-    log_ok "cleanup completed (removals: $cleanup_removed)"
-fi
+summary_scope_remove_ok "cleanup"
 
 log_section "Link Conflict Check"
 log_step "Check top-level destination conflicts"
@@ -96,8 +67,7 @@ preflight_shell_themes || exit 1
 log_ok "no destination conflicts found"
 
 log_section "Link Top-Level Dotfiles"
-root_linked_before=$INSTALL_SUMMARY_LINKED
-root_would_link_before=$INSTALL_SUMMARY_WOULD_LINK
+summary_scope_begin
 log_step "Source: $DOTPATH"
 log_step "Target: $HOME"
 for f in .??*; do
@@ -105,45 +75,29 @@ for f in .??*; do
     should_skip_root_entry "$(basename "$f")" && continue
     link_managed_entry "$DOTPATH/$f" "$HOME/$f" "$DOTPATH" || exit 1
 done
-root_linked=$((INSTALL_SUMMARY_LINKED - root_linked_before))
-root_would_link=$((INSTALL_SUMMARY_WOULD_LINK - root_would_link_before))
 if is_dry_run; then
-    log_ok "top-level dotfiles reconciled (planned links: $root_would_link)"
+    log_ok "top-level dotfiles reconciled (planned links: $(summary_scope_delta would_link))"
 else
-    log_ok "top-level dotfiles reconciled (links: $root_linked)"
+    log_ok "top-level dotfiles reconciled (links: $(summary_scope_delta linked))"
 fi
 
 log_section "Link Managed Dotfile Surfaces"
 log_surface_manifests
-surface_linked_before=$INSTALL_SUMMARY_LINKED
-surface_would_link_before=$INSTALL_SUMMARY_WOULD_LINK
-surface_removed_before=$INSTALL_SUMMARY_REMOVED
-surface_would_remove_before=$INSTALL_SUMMARY_WOULD_REMOVE
-surface_skipped_before=$INSTALL_SUMMARY_SKIPPED
+summary_scope_begin
 link_all_managed_surfaces || exit 1
-surface_linked=$((INSTALL_SUMMARY_LINKED - surface_linked_before))
-surface_would_link=$((INSTALL_SUMMARY_WOULD_LINK - surface_would_link_before))
-surface_removed=$((INSTALL_SUMMARY_REMOVED - surface_removed_before))
-surface_would_remove=$((INSTALL_SUMMARY_WOULD_REMOVE - surface_would_remove_before))
-surface_skipped=$((INSTALL_SUMMARY_SKIPPED - surface_skipped_before))
 if is_dry_run; then
-    log_ok "managed dotfile surfaces reconciled (planned links: $surface_would_link, planned removals: $surface_would_remove, skips: $surface_skipped)"
+    log_ok "managed dotfile surfaces reconciled (planned links: $(summary_scope_delta would_link), planned removals: $(summary_scope_delta would_remove), skips: $(summary_scope_delta skipped))"
 else
-    log_ok "managed dotfile surfaces reconciled (links: $surface_linked, removals: $surface_removed, skips: $surface_skipped)"
+    log_ok "managed dotfile surfaces reconciled (links: $(summary_scope_delta linked), removals: $(summary_scope_delta removed), skips: $(summary_scope_delta skipped))"
 fi
 
 log_section "Link Shell Themes"
-theme_linked_before=$INSTALL_SUMMARY_LINKED
-theme_would_link_before=$INSTALL_SUMMARY_WOULD_LINK
-theme_skipped_before=$INSTALL_SUMMARY_SKIPPED
+summary_scope_begin
 link_shell_themes || exit 1
-theme_linked=$((INSTALL_SUMMARY_LINKED - theme_linked_before))
-theme_would_link=$((INSTALL_SUMMARY_WOULD_LINK - theme_would_link_before))
-theme_skipped=$((INSTALL_SUMMARY_SKIPPED - theme_skipped_before))
 if is_dry_run; then
-    log_ok "shell themes reconciled (planned links: $theme_would_link, skips: $theme_skipped)"
+    log_ok "shell themes reconciled (planned links: $(summary_scope_delta would_link), skips: $(summary_scope_delta skipped))"
 else
-    log_ok "shell themes reconciled (links: $theme_linked, skips: $theme_skipped)"
+    log_ok "shell themes reconciled (links: $(summary_scope_delta linked), skips: $(summary_scope_delta skipped))"
 fi
 
 if is_dry_run; then

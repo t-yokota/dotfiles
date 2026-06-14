@@ -5,6 +5,9 @@ if [ -z "${BASH_VERSION:-}" ]; then
     exit 1
 fi
 
+set -u
+# Do not use set -e: status phases intentionally propagate errors with explicit || exit handling.
+
 usage() {
     cat <<'USAGE'
 Usage: bash status.sh [--verbose|-v]
@@ -17,41 +20,19 @@ USAGE
 
 STATUS_VERBOSE=0
 
-while [ "$#" -gt 0 ]; do
-    case "$1" in
-        -v|--verbose)
-            STATUS_VERBOSE=1
-            ;;
-        -h|--help)
-            usage
-            exit 0
-            ;;
-        *)
-            echo "Error: unknown option: $1" >&2
-            usage >&2
-            exit 1
-            ;;
-    esac
-    shift
-done
-
 DOTPATH=${DOTPATH:-"$HOME/dotfiles"}
-OH_MY_ZSH_THEMES=${OH_MY_ZSH_THEMES:-"$HOME/.oh-my-zsh/themes"}
-
-cd "$DOTPATH" || { echo "Error: Could not cd to $DOTPATH"; exit 1; }
-
-# Include hidden managed entries such as .claude/.agents, and make empty globs disappear.
-shopt -s nullglob dotglob
-
 INSTALL_LIB_DIR="$DOTPATH/scripts/install/lib"
 COMMON_LIB="$INSTALL_LIB_DIR/common.sh"
 if [ ! -f "$COMMON_LIB" ]; then
     echo "Error: missing installer library: $COMMON_LIB" >&2
     exit 1
 fi
+# shellcheck source=scripts/install/lib/common.sh
 . "$COMMON_LIB"
-init_installer_state
-load_installer_libraries profile reconcile status || exit 1
+# shellcheck source=scripts/install/lib/cli.sh
+. "$INSTALL_LIB_DIR/cli.sh"
+cli_parse_standard_options status "$@" || exit 1
+cli_bootstrap profile reconcile status || exit 1
 
 BRANCH=$(get_current_branch)
 

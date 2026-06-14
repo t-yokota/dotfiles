@@ -19,12 +19,21 @@ is_reserved_root_entry() {
     list_contains "$name" "${RESERVED_ROOT_ENTRIES[@]}"
 }
 
+warn_unknown_branch_no_profile() {
+    if [ "${UNKNOWN_BRANCH_WARNED:-0}" = "1" ]; then
+        return 0
+    fi
+
+    log_step "Warn: current branch is unknown (detached HEAD?); no profile will be applied"
+    UNKNOWN_BRANCH_WARNED=1
+}
+
 # Repo-local control files and managed roots are never linked as top-level
 # entries. Active profile source roots are also reserved dynamically from the
 # loaded surface manifest.
 should_skip_root_entry() {
     case "$1" in
-        .git|.gitignore|.gitconfig.local)
+        .git|.github|.gitignore|.gitconfig.local)
             return 0
             ;;
     esac
@@ -126,23 +135,33 @@ validate_skipsets_line() {
 
     IFS=$'\t' read -r kind name pattern extra <<< "$line"
 
-    if [ "$kind" != "skipset" ]; then
-        manifest_error "$file" "$line_number" "unknown skipsets kind: ${kind:-<empty>}"
-        return 1
-    fi
+    case "$kind" in
+        skipset|skipset-include) ;;
+        *)
+            manifest_error "$file" "$line_number" "unknown skipsets kind: ${kind:-<empty>}"
+            return 1
+            ;;
+    esac
 
     if [ -z "$name" ]; then
-        manifest_error "$file" "$line_number" "skipset row requires a name"
+        manifest_error "$file" "$line_number" "$kind row requires a name"
         return 1
     fi
 
     if [ -z "$pattern" ]; then
-        manifest_error "$file" "$line_number" "skipset row requires a pattern"
+        case "$kind" in
+            skipset)
+                manifest_error "$file" "$line_number" "skipset row requires a pattern"
+                ;;
+            *)
+                manifest_error "$file" "$line_number" "skipset-include row requires an include name"
+                ;;
+        esac
         return 1
     fi
 
     if [ -n "$extra" ]; then
-        manifest_error "$file" "$line_number" "skipset row has too many columns"
+        manifest_error "$file" "$line_number" "$kind row has too many columns"
         return 1
     fi
 }
@@ -231,7 +250,102 @@ add_skip_pattern() {
     [ -n "$skipset" ] || return 0
     [ -n "$pattern" ] || return 0
     add_known_skipset "$skipset"
+    add_skip_pattern_entry "$skipset" "$pattern"
+    propagate_skip_pattern_to_dependents "$skipset" "$pattern"
+}
+
+add_skip_pattern_entry() {
+    local skipset="$1"
+    local pattern="$2"
+
+    [ -n "$skipset" ] || return 0
+    [ -n "$pattern" ] || return 0
     SKIPSET_PATTERNS+=("$skipset"$'\t'"$pattern")
+}
+
+propagate_skip_pattern_to_dependents() {
+    local source_skipset="$1"
+    local pattern="$2"
+    local entry dependent include_name
+
+    for entry in "${SKIPSET_INCLUDES[@]}"; do
+        IFS=$'\t' read -r dependent include_name <<< "$entry"
+        [ "$include_name" = "$source_skipset" ] || continue
+        add_skip_pattern_entry "$dependent" "$pattern"
+        propagate_skip_pattern_to_dependents "$dependent" "$pattern"
+    done
+}
+
+skipset_include_exists() {
+    local skipset="$1"
+    local include_name="$2"
+    local entry existing_skipset existing_include
+
+    for entry in "${SKIPSET_INCLUDES[@]}"; do
+        IFS=$'\t' read -r existing_skipset existing_include <<< "$entry"
+        [ "$existing_skipset" = "$skipset" ] || continue
+        [ "$existing_include" = "$include_name" ] && return 0
+    done
+
+    return 1
+}
+
+skipset_depends_on() {
+    local skipset="$1"
+    local sought="$2"
+    local entry existing_skipset include_name
+
+    for entry in "${SKIPSET_INCLUDES[@]}"; do
+        IFS=$'\t' read -r existing_skipset include_name <<< "$entry"
+        [ "$existing_skipset" = "$skipset" ] || continue
+        [ "$include_name" = "$sought" ] && return 0
+        skipset_depends_on "$include_name" "$sought" && return 0
+    done
+
+    return 1
+}
+
+copy_skip_patterns() {
+    local skipset="$1"
+    local include_name="$2"
+    local entry set pattern
+
+    for entry in "${SKIPSET_PATTERNS[@]}"; do
+        IFS=$'\t' read -r set pattern <<< "$entry"
+        [ "$set" = "$include_name" ] || continue
+        add_skip_pattern "$skipset" "$pattern"
+    done
+}
+
+add_skipset_include() {
+    local file="$1"
+    local line_number="$2"
+    local skipset="$3"
+    local include_name="$4"
+
+    if [ "$skipset" = "$include_name" ]; then
+        manifest_error "$file" "$line_number" "skipset-include cannot include itself: $skipset"
+        return 1
+    fi
+
+    if ! is_known_skipset "$include_name"; then
+        manifest_error "$file" "$line_number" "skipset-include references unknown skipset: $include_name"
+        return 1
+    fi
+
+    if skipset_include_exists "$skipset" "$include_name"; then
+        manifest_error "$file" "$line_number" "duplicate skipset include: $skipset includes $include_name"
+        return 1
+    fi
+
+    if skipset_depends_on "$include_name" "$skipset"; then
+        manifest_error "$file" "$line_number" "skipset-include would create a cycle: $skipset -> $include_name"
+        return 1
+    fi
+
+    add_known_skipset "$skipset"
+    SKIPSET_INCLUDES+=("$skipset"$'\t'"$include_name")
+    copy_skip_patterns "$skipset" "$include_name"
 }
 
 should_skip_entry() {
@@ -245,6 +359,7 @@ should_skip_entry() {
     for entry in "${SKIPSET_PATTERNS[@]}"; do
         IFS=$'\t' read -r set pattern <<< "$entry"
         [ "$set" = "$skipset" ] || continue
+        # shellcheck disable=SC2053 # skipset patterns are intentionally Bash globs.
         if [[ "$name" == $pattern ]]; then
             return 0
         fi
@@ -322,6 +437,7 @@ profile_matches_branch() {
         validate_profile_manifest_line "$manifest" "$line_number" "$line" || return 2
         IFS=$'\t' read -r kind pattern rest <<< "$line"
         [ "$kind" = "branch" ] || continue
+        # shellcheck disable=SC2053 # profile branch patterns are intentionally Bash globs.
         if [[ "$branch" == $pattern ]]; then
             return 0
         fi
@@ -344,7 +460,14 @@ load_skipsets_file() {
         line_is_ignored "$line" && continue
         validate_skipsets_line "$file" "$line_number" "$line" || return 1
         IFS=$'\t' read -r kind name pattern rest <<< "$line"
-        add_skip_pattern "$name" "$pattern"
+        case "$kind" in
+            skipset)
+                add_skip_pattern "$name" "$pattern"
+                ;;
+            skipset-include)
+                add_skipset_include "$file" "$line_number" "$name" "$pattern" || return 1
+                ;;
+        esac
     done < "$file"
 }
 
@@ -433,7 +556,10 @@ load_active_profile_manifests() {
     local match_rc
 
     branch=$(get_current_branch)
-    [ -n "$branch" ] || return 0
+    [ -n "$branch" ] || {
+        warn_unknown_branch_no_profile
+        return 0
+    }
 
     for manifest in "$DOTPATH"/profiles/*/profile.tsv; do
         [ -f "$manifest" ] || continue
@@ -460,7 +586,10 @@ run_active_profile_install_checks() {
     local rc=0
 
     branch=$(get_current_branch)
-    [ -n "$branch" ] || return 0
+    [ -n "$branch" ] || {
+        warn_unknown_branch_no_profile
+        return 0
+    }
 
     for checks_dir in "${ACTIVE_PROFILE_CHECK_DIRS[@]}"; do
         [ -d "$checks_dir" ] || continue

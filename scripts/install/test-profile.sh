@@ -21,6 +21,7 @@ for lib in common profile; do
         echo "Error: missing installer library: $lib_path" >&2
         exit 1
     fi
+    # shellcheck disable=SC1090 # lib_path is validated from INSTALL_LIB_DIR at runtime.
     . "$lib_path"
 done
 
@@ -227,6 +228,7 @@ profile_manifest_value() {
 
 run_installer_fixture() {
     local output="$TEST_ROOT/install.log"
+    local install_script="$DOTPATH/install.sh"
 
     mkdir -p "$TEST_HOME" || return 1
 
@@ -234,7 +236,7 @@ run_installer_fixture() {
     DOTPATH="$DOTPATH" \
     DOTFILES_BRANCH="$BRANCH" \
     OH_MY_ZSH_THEMES="$TEST_HOME/.oh-my-zsh/themes" \
-        bash "$DOTPATH/install.sh" > "$output" 2>&1 || {
+        bash "$install_script" > "$output" 2>&1 || {
             sed 's/^/  | /' "$output" >&2
             return 1
         }
@@ -246,7 +248,7 @@ run_installer_fixture() {
 
 check_surface_outputs() {
     local surfaces_rel surfaces_file
-    local line kind strategy source_rel dest_rel skipset label
+    local line kind strategy source_rel dest_rel _skipset label
     local source_path dest_path
 
     surfaces_rel=$(profile_manifest_value "$PROFILE_DIR/profile.tsv" "surfaces" "surfaces.tsv")
@@ -255,7 +257,7 @@ check_surface_outputs() {
 
     while IFS= read -r line; do
         line_is_ignored "$line" && continue
-        IFS=$'\t' read -r kind strategy source_rel dest_rel skipset label <<< "$line"
+        IFS=$'\t' read -r kind strategy source_rel dest_rel _skipset label <<< "$line"
         [ "$kind" = "surface" ] || continue
 
         source_path=$(resolve_dotpath_path "$source_rel")

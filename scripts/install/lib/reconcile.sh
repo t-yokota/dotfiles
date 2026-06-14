@@ -280,7 +280,7 @@ link_managed_entries() {
         child_source="$source_dir/$name"
 
         if should_skip_entry "$skipset" "$name"; then
-            log_substep "Skip runtime or separately managed entry: $f"
+            count_and_log_skip substep "Skip runtime or separately managed entry: $f"
             if is_managed_symlink "$dest" "$source_dir" && ! is_surface_source "$child_source"; then
                 remove_managed_path "$dest"
             fi
@@ -288,7 +288,7 @@ link_managed_entries() {
         fi
 
         if should_defer_to_child_surface_entry "$source_dir" "$name"; then
-            log_substep "Skip child surface entry: $f"
+            count_and_log_skip substep "Skip child surface entry: $f"
             continue
         fi
 
@@ -372,7 +372,7 @@ link_shell_themes() {
     local theme theme_dest
 
     if [ ! -d "$OH_MY_ZSH_THEMES" ]; then
-        log_step "Skip: $OH_MY_ZSH_THEMES does not exist"
+        count_and_log_skip step "Skip: $OH_MY_ZSH_THEMES does not exist"
         return 0
     fi
 

@@ -5,12 +5,15 @@ if [ -z "${BASH_VERSION:-}" ]; then
     exit 1
 fi
 
+set -u
+# Do not use set -e: uninstaller phases intentionally propagate errors with explicit || exit handling.
+
 usage() {
     cat <<'USAGE'
 Usage: bash uninstall.sh [--dry-run|-n] [--verbose|-v]
 
 Options:
-  -n, --dry-run  Show dotfiles-managed symlinks that would be removed without writing changes.
+  -n, --dry-run  Show planned removals without writing changes.
   -v, --verbose  Print detailed remove logs.
   -h, --help     Show this help.
 USAGE
@@ -19,64 +22,22 @@ USAGE
 INSTALL_DRY_RUN=0
 INSTALL_VERBOSE=0
 
-while [ "$#" -gt 0 ]; do
-    case "$1" in
-        -n|--dry-run)
-            INSTALL_DRY_RUN=1
-            ;;
-        -v|--verbose)
-            INSTALL_VERBOSE=1
-            ;;
-        -h|--help)
-            usage
-            exit 0
-            ;;
-        *)
-            echo "Error: unknown option: $1" >&2
-            usage >&2
-            exit 1
-            ;;
-    esac
-    shift
-done
-
-uninstall_scope_begin() {
-    UNINSTALL_SCOPE_REMOVED=$INSTALL_SUMMARY_REMOVED
-    UNINSTALL_SCOPE_WOULD_REMOVE=$INSTALL_SUMMARY_WOULD_REMOVE
-}
-
-uninstall_scope_result() {
-    local label="$1"
-    local removed=$((INSTALL_SUMMARY_REMOVED - UNINSTALL_SCOPE_REMOVED))
-    local would_remove=$((INSTALL_SUMMARY_WOULD_REMOVE - UNINSTALL_SCOPE_WOULD_REMOVE))
-
-    if is_dry_run; then
-        log_ok "$label checked (planned removals: $would_remove)"
-    else
-        log_ok "$label completed (removals: $removed)"
-    fi
-}
-
 DOTPATH=${DOTPATH:-"$HOME/dotfiles"}
-OH_MY_ZSH_THEMES=${OH_MY_ZSH_THEMES:-"$HOME/.oh-my-zsh/themes"}
-
-cd "$DOTPATH" || { echo "Error: Could not cd to $DOTPATH"; exit 1; }
-
-# Include hidden managed entries such as .claude/.agents, and make empty globs disappear.
-shopt -s nullglob dotglob
-
 INSTALL_LIB_DIR="$DOTPATH/scripts/install/lib"
 COMMON_LIB="$INSTALL_LIB_DIR/common.sh"
 if [ ! -f "$COMMON_LIB" ]; then
     echo "Error: missing installer library: $COMMON_LIB" >&2
     exit 1
 fi
+# shellcheck source=scripts/install/lib/common.sh
 . "$COMMON_LIB"
-init_installer_state
-load_installer_libraries profile reconcile || exit 1
+# shellcheck source=scripts/install/lib/cli.sh
+. "$INSTALL_LIB_DIR/cli.sh"
+cli_parse_standard_options uninstall "$@" || exit 1
+cli_bootstrap profile reconcile || exit 1
 
 log_mode_section \
-    "Dry-run mode: no symlink changes will be written by the common uninstaller" \
+    "Dry-run mode: no symlink changes will be written by the common uninstaller. Use --verbose to list each planned removal." \
     "Verbose mode: detailed remove logs will be printed"
 
 log_section "Preflight"
@@ -85,26 +46,26 @@ load_active_profile_manifests || exit 1
 log_ok "preflight passed"
 
 log_section "Remove Top-Level Dotfile Links"
-uninstall_scope_begin
+summary_scope_begin
 uninstall_root_symlinks || exit 1
-uninstall_scope_result "top-level dotfile links"
+summary_scope_remove_ok "top-level dotfile links"
 
 log_section "Remove Managed Dotfile Surface Links"
-uninstall_scope_begin
+summary_scope_begin
 log_surface_manifests
 uninstall_all_managed_surfaces || exit 1
-uninstall_scope_result "managed dotfile surface links"
+summary_scope_remove_ok "managed dotfile surface links"
 
 log_section "Remove Unscoped Managed Links"
-uninstall_scope_begin
+summary_scope_begin
 log_managed_roots
 uninstall_unscoped_managed_links || exit 1
-uninstall_scope_result "unscoped managed links"
+summary_scope_remove_ok "unscoped managed links"
 
 log_section "Remove Shell Theme Links"
-uninstall_scope_begin
+summary_scope_begin
 uninstall_shell_themes || exit 1
-uninstall_scope_result "shell theme links"
+summary_scope_remove_ok "shell theme links"
 
 if is_dry_run; then
     log_section "Dry-run Result"

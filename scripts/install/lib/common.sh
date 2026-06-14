@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 
-# Shared installer utilities with no profile-specific policy: logging, ignored
-# manifest lines, branch lookup, and path normalization helpers.
+# Shared policy-free utilities: logging, manifest lines, branch, and path helpers.
 
 INSTALL_SUMMARY_LINKED=${INSTALL_SUMMARY_LINKED:-0}
 INSTALL_SUMMARY_WOULD_LINK=${INSTALL_SUMMARY_WOULD_LINK:-0}
@@ -13,11 +12,18 @@ INSTALL_VERBOSE=${INSTALL_VERBOSE:-0}
 MANAGED_ROOTS=(.claude .codex .agents)
 
 init_installer_state() {
+    # shellcheck disable=SC2034 # Shared state read by sourced installer libraries.
     MANAGED_SURFACES=()
     MANAGED_SURFACE_MANIFESTS=()
+    # shellcheck disable=SC2034 # Shared state read by sourced installer libraries.
     SKIPSET_PATTERNS=()
+    # shellcheck disable=SC2034 # Shared state read by sourced installer libraries.
+    SKIPSET_INCLUDES=()
+    # shellcheck disable=SC2034 # Shared state read by sourced installer libraries.
     KNOWN_SKIPSETS=()
+    # shellcheck disable=SC2034 # Shared state read by sourced installer libraries.
     RESERVED_ROOT_ENTRIES=()
+    # shellcheck disable=SC2034 # Shared state read by sourced installer libraries.
     ACTIVE_PROFILE_CHECK_DIRS=()
 }
 
@@ -30,6 +36,7 @@ load_installer_libraries() {
             echo "Error: missing installer library: $lib_path" >&2
             return 1
         fi
+        # shellcheck disable=SC1090 # lib_path is validated from INSTALL_LIB_DIR at runtime.
         . "$lib_path"
     done
 }
@@ -119,6 +126,35 @@ summary_increment() {
     esac
 }
 
+summary_scope_begin() {
+    SUMMARY_SCOPE_LINKED=$INSTALL_SUMMARY_LINKED
+    SUMMARY_SCOPE_WOULD_LINK=$INSTALL_SUMMARY_WOULD_LINK
+    SUMMARY_SCOPE_REMOVED=$INSTALL_SUMMARY_REMOVED
+    SUMMARY_SCOPE_WOULD_REMOVE=$INSTALL_SUMMARY_WOULD_REMOVE
+    SUMMARY_SCOPE_SKIPPED=$INSTALL_SUMMARY_SKIPPED
+}
+
+summary_scope_delta() {
+    case "$1" in
+        linked) printf '%s\n' $((INSTALL_SUMMARY_LINKED - ${SUMMARY_SCOPE_LINKED:-0})) ;;
+        would_link) printf '%s\n' $((INSTALL_SUMMARY_WOULD_LINK - ${SUMMARY_SCOPE_WOULD_LINK:-0})) ;;
+        removed) printf '%s\n' $((INSTALL_SUMMARY_REMOVED - ${SUMMARY_SCOPE_REMOVED:-0})) ;;
+        would_remove) printf '%s\n' $((INSTALL_SUMMARY_WOULD_REMOVE - ${SUMMARY_SCOPE_WOULD_REMOVE:-0})) ;;
+        skipped) printf '%s\n' $((INSTALL_SUMMARY_SKIPPED - ${SUMMARY_SCOPE_SKIPPED:-0})) ;;
+        *) printf '%s\n' 0 ;;
+    esac
+}
+
+summary_scope_remove_ok() {
+    local label="$1"
+
+    if is_dry_run; then
+        log_ok "$label checked (planned removals: $(summary_scope_delta would_remove))"
+    else
+        log_ok "$label completed (removals: $(summary_scope_delta removed))"
+    fi
+}
+
 summary_mark_remove_path() {
     local path="$1"
 
@@ -198,7 +234,6 @@ log_step() {
             printf '\n'
             ;;
         Skip:*)
-            summary_increment skipped
             printf '  '
             color_gray "$1"
             printf '\n'
@@ -224,7 +259,7 @@ is_verbose() {
 }
 
 should_log_detail() {
-    is_verbose || is_dry_run
+    is_verbose
 }
 
 log_ok() {
@@ -263,7 +298,6 @@ log_substep() {
             printf '\n'
             ;;
         Skip*)
-            summary_increment skipped
             should_log_detail || return 0
             printf '    - '
             color_gray "$1"
@@ -282,6 +316,23 @@ log_substep() {
     esac
 }
 
+count_and_log_skip() {
+    local style="$1"
+    local message="$2"
+
+    summary_increment skipped
+
+    case "$style" in
+        step) log_step "$message" ;;
+        substep) log_substep "$message" ;;
+        *)
+            echo "Error: unknown skip log style: $style" >&2
+            return 1
+            ;;
+    esac
+}
+
+# Action-specific log helpers update counters without message-prefix coupling.
 log_link() {
     summary_increment linked
     is_verbose || return 0
@@ -292,6 +343,7 @@ log_link() {
 
 log_would_link() {
     summary_increment would_link
+    is_verbose || return 0
     printf '    - '
     color_cyan "Would create symlink: $1 -> $2"
     printf '\n'
