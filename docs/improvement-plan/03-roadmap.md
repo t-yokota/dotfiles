@@ -100,8 +100,8 @@ R / D task の詳細指示は各計画書を参照。以下は F-task の詳細�
 
 - [x] `docs/worktree-workflow.md` が存在し、課題・規則・コマンド例・復旧手順を含む。
 - [x] top-level README から参照されている。
-- [ ] `~/dotfiles` の checkout branch を変えずに、worktree 経由で `main` へ commit できることを実証済み。
-- [ ] 適用中 profile の HOME symlink が main 作業の前後で一切変化しない (`bash status.sh` の出力比較で確認)。
+- [x] `~/dotfiles` の checkout branch を変えずに、worktree 経由で `main` へ commit できることを実証済み。
+- [x] 適用中 profile の HOME symlink が main 作業の前後で一切変化しない (`bash status.sh` の出力比較で確認)。
 
 ### 補足 (helper script の扱い)
 
