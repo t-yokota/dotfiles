@@ -1,6 +1,6 @@
 # Installer Development Guide
 
-- Last reviewed: 2026-06-14
+- Last reviewed: 2026-06-29
 
 この guide は、common installer (`install.sh`, `uninstall.sh`, `status.sh`, `scripts/install/`) を変更する人と agent 向けの開発メモです。実 HOME を直接使わず、fixture と dry-run で安全に検証する前提で書いています。
 
@@ -63,9 +63,27 @@ dry-run と verbose は別軸です。`--dry-run` は書き込み判定と summa
 | `bash scripts/install/test-installer.sh` | common installer の regression。fixture checkout と fixture HOME だけを使う。 |
 | `bash scripts/install/test-installer.sh --case '60-*'` | case file 名または test 名 glob による部分実行。 |
 | `bash scripts/install/test-profile.sh --profile profiles/<name> --branch <branch>` | profile manifest と surface が isolated HOME に適用できるかの smoke test。 |
+| `bash profiles/<name>/bin/test-profile.sh --branch profile/<name>-base` | profile-local wrapper を使った smoke test。wrapper がある profile で実行する。 |
 | `bash scripts/install/test-all.sh` | lint、installer regression、active profile smoke test の集約。 |
 
 実 HOME を直接変更する test は書きません。実 HOME に対して確認したい場合は `bash install.sh --dry-run`, `bash uninstall.sh --dry-run`, `bash status.sh` に留めます。
+
+## Adding or Copying a Profile
+
+既存 profile を元に別 profile を作る場合は、`profile/<name>-base` またはその派生 branch にある `profiles/<name>/` を一式コピーします。`profile.tsv`, `surfaces.tsv`, `skipsets.tsv`, `checks.d/` に加えて、`bin/` に置いた profile-local な補助 script や smoke test も移植対象です。
+
+移植後は `profile.tsv` の branch pattern と manifest / check path を新しい profile 名に合わせます。まず共通 runner で manifest と surface を検証し、profile-local wrapper がある場合は wrapper からも同じ smoke test が通ることを確認します。
+
+```bash
+bash scripts/install/test-profile.sh \
+    --profile profiles/<name> \
+    --branch profile/<name>-base
+
+bash profiles/<name>/bin/test-profile.sh \
+    --branch profile/<name>-base
+```
+
+最後に `bash scripts/install/test-all.sh` を実行し、common installer regression と active profile smoke test をまとめて確認します。
 
 ## Adding Regression Cases
 
