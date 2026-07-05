@@ -290,7 +290,7 @@ ECC repo (`$ECC_REPO`) の version と、dotfiles 側に取り込み済みの生
 
 1. `.zshrc` から「コメントアウトされた stock template 行」を削除し、実効設定 (ZSH path, `ZSH_THEME="my"`, plugins, alias 等) + 自分で意図して書いた comment のみ残す。**実効行は 1 行も変えない** (削除はコメントと空行のみ)。
 2. 適用後、新しい zsh session を起動して theme・plugin・alias が変更前と同一に動くことを確認する (`zsh -i -c 'echo $ZSH_THEME; alias'` の前後比較)。
-3. `archive/` (.bashrc, .inputrc) の扱いを決める: installer は `.??*` glob で top-level のみ link するため archive/ は link されない。現状維持でよいが、docs/README.md の索引に「archive は参照用・非適用」と 1 行記載する。
+3. `archive/` (.bashrc, .inputrc) の扱いを決める: installer は `.??*` glob で top-level のみ link するため archive/ は link されない。現状維持でよいが、docs/README.md の索引に「archive は参照用・非適用」と 1 行記載する (この記載は D1 実施時に `docs/README.md` の Related Reference 節へ反映済み。D8-1 で確認)。
 4. `.vimrc` は実用設定のみで構成されており変更不要 (この判断を実施記録に残す)。
 
 ### 受け入れ基準

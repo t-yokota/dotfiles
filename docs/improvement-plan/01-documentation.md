@@ -30,6 +30,13 @@ commit hash は未作成です。最終 commit 作成時に D7 の規則に従�
 | D5 | 完了 | `docs/reference/status-classification.md` を追加し、`status.sh` の 6 分類と対処方法を実装準拠で文書化。 |
 | D6 | 部分完了 | README を 143 行へ縮小し、詳細仕様を `docs/README.md` / reference / roadmap へ誘導。profile 専用 lifecycle 文書へのリンクは D4 実施後に profile branch 側で反映する。 |
 
+## 実施記録 (2026-07-06)
+
+| Task | 状態 | 証跡 |
+|---|---|---|
+| D8-1 | 完了 | 指摘 1: 作業中だった top-level README の再構成と `docs/development.md` の profile 作成手順を main へ commit。leaf 固有の `.claude/settings.json` / `.codex/config.toml` は leaf へ commit。指摘 2-3: `worktree-workflow.md` から task ID「F6」参照を除去し、見出しを英語へ統一、作業ログ調の「F6 Verification」節を削除 (検証事実は 03-roadmap の F6 受け入れ基準に記録済み)。指摘 4: 文中 `<br>` は top-level README の 3 箇所のみ残存しており段落分けへ置換。`ecc-application-map.md` / `ecc-dotfiles-manual-install.md` の `<br/>` は mermaid label 内のみで対象なし。指摘 5: `ecc-application-map.md` の cross-link を lifecycle 分離後の構成へ更新し日付を更新 (base 側 commit)。指摘 6: 内容変更した計画文書の `Last reviewed` を 2026-07-06 へ更新。指摘 7: F5 手順 3 に D1 反映済みの注記を追加。 |
+| D8-2 | 未着手 | F7 完了後に実施。 |
+
 ---
 
 ## D1: docs 索引と鮮度規約の導入

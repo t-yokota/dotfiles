@@ -20,7 +20,9 @@
 
 ## Branch Strategy
 
-`main` は portable な base branch です。共通 dotfiles、共通 installer、共通 ignore rule を置きます。<br>profile branch は、共通 dotfiles だけでは足りず、かつ `main` に固定せず切り替えたい構成を扱います。profile 固有の dotfile 本体だけでなく、特定のツールを使って dotfile 群を構成するための手順書や補助 script も配置できます。
+`main` は portable な base branch です。共通 dotfiles、共通 installer、共通 ignore rule を置きます。
+
+profile branch は、共通 dotfiles だけでは足りず、かつ `main` に固定せず切り替えたい構成を扱います。profile 固有の dotfile 本体だけでなく、特定のツールを使って dotfile 群を構成するための手順書や補助 script も配置できます。
 
 具体的には、次のような branch 構成を基本形にします。
 
@@ -36,7 +38,9 @@ profile/<name>/<environment>
 
 たとえば [ECC](https://github.com/affaan-m/ECC) 用の profile では、`profile/ecc-base` に ECC の導入手順、profile manifest、installer 連携用の補助 script を置きます。`profile/ecc/<environment>` で ECC installer / sync を実行して Claude / Codex 用の desired state を生成し、その後 dotfiles の `bash install.sh` で実 HOME へ symlink します。machine-local な marker は環境側に保持し、Git には commit しません。
 
-`~/dotfiles` 本体は、実 HOME に適用中の profile branch に常駐させます。`main` や `profile/ecc-base` の編集・commit 作業は repo 外の `git worktree` で行い、`DOTPATH` を worktree に向けて `install.sh` を実行しません。<br>共通資産を適用環境へ取り込むときは、本体 checkout を適用 branch に乗せたまま merge し、必要に応じて `bash install.sh` を再実行します。詳しい手順と復旧方法は [docs/worktree-workflow.md](docs/worktree-workflow.md) を参照します。
+`~/dotfiles` 本体は、実 HOME に適用中の profile branch に常駐させます。`main` や `profile/ecc-base` の編集・commit 作業は repo 外の `git worktree` で行い、`DOTPATH` を worktree に向けて `install.sh` を実行しません。
+
+共通資産を適用環境へ取り込むときは、本体 checkout を適用 branch に乗せたまま merge し、必要に応じて `bash install.sh` を再実行します。詳しい手順と復旧方法は [docs/worktree-workflow.md](docs/worktree-workflow.md) を参照します。
 
 
 既存 profile を元に別 profile を作る場合は、`profile/<name>-base` またはその派生 branch にある `profiles/<name>/` を profile の資産として一式コピーします。profile の枠組みを定義する `profile.tsv`, `surfaces.tsv`, `skipsets.tsv`, `checks.d/` だけでなく、`bin/` に置いた profile-local な補助 script や smoke test も移植対象です。具体的な作成・検証手順は [docs/development.md](docs/development.md) を参照します。
@@ -66,7 +70,7 @@ installer を変更する場合は、構成とテスト追加手順を [docs/dev
 
 ## How to Install
 
-適用したい branch を checkout した状態で、Bash から installer を実行します。<br>`install.sh` は Bash 前提です。`sh install.sh` では実行せず、誤って Bash 以外から起動された場合は早期に終了します。
+適用したい branch を checkout した状態で、Bash から installer を実行します。`install.sh` は Bash 前提のため、`sh install.sh` では実行せず、誤って Bash 以外から起動された場合は早期に終了します。
 
 ```bash
 cd ~/dotfiles
