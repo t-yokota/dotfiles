@@ -1,6 +1,6 @@
 # 実装タスク再計画 (Roadmap)
 
-- Last reviewed: 2026-06-14
+- Last reviewed: 2026-07-06
 - 前提: [README.md](README.md) の実行規則、[01-documentation.md](01-documentation.md)、[02-refactoring.md](02-refactoring.md)
 
 この計画書は、リファクタリング (R-tasks)・ドキュメント (D-tasks)・機能拡張 (F-tasks) を依存関係順に統合した実行 roadmap です。top-level README の旧「Future Work」(ECC profile の Claude/Codex 選択適用、main↔profile 同期補助) は F1 / F2 としてここに吸収します。
@@ -12,7 +12,7 @@ Phase 0  ガード整備            F6 worktree運用 → R5 lint → R6 CI → 
 Phase 1  振る舞い非変更リファクタ R1 → R2 → R3 → R11 → R7 (並行可: R9, R10) (任意: R4)
 Phase 2  manifest schema 進化   R8
 Phase 3  ドキュメント再構成      D3 → D2 → D5 → D4 → D6
-Phase 4  branch反映と案B移行   main/profile/ecc-base反映 → F7 (案B 移行)
+Phase 4  branch反映と案B移行   main/profile/ecc-base反映 → D8-1 (docs整備) → F7 (案B 移行) → D8-2 (docs再整備)
 Phase 5  機能拡張              F1 → F3 → F2
 Phase 6  周辺整理              F4, F5, D7 (計画文書の archive)
 ```
@@ -48,6 +48,7 @@ Phase 6  周辺整理              F4, F5, D7 (計画文書の archive)
 | D5 | status 分類 reference | 3 | 中 | 小 | - | - |
 | D4 | manual-install の lifecycle 分離 | 3 | 中 | 中 | - | - |
 | D6 | README スリム化・roadmap 分離 | 3 | 中 | 小 | D2,D5 | - |
+| D8 | ドキュメント整備パス (文体・語彙・鮮度) | 4 | 高 | 中 | D8-1: なし / D8-2: F7 | - |
 | F7 | deploy worktree (案B) への移行 | 4 | 最高 | 大 | branch反映完了,F6 | あり (適用構造変更) |
 | F1 | ECC profile: Claude / Codex 選択適用 | 5 | 高 | 中 | Phase 4 完了 | あり |
 | F3 | profile scaffolding script | 5 | 中 | 中 | R8,D2 | なし (新規追加) |

@@ -1,8 +1,9 @@
 # Dotfiles Improvement Plan
 
-- Last reviewed: 2026-06-11
-- Baseline branch: `profile/ecc/full/home-9M2KERO` (assessment 時点)
-- Baseline verification: `bash scripts/install/test-all.sh` → installer regression 31/31 PASS, ECC profile smoke test PASS
+- Last reviewed: 2026-07-06
+- Baseline branch: `profile/ecc/full/home-9M2KERO` (initial assessment: 2026-06-11)
+- 初回 baseline: installer regression 31/31 PASS, ECC profile smoke test PASS
+- 2026-07-06 時点: installer regression 40/40 PASS (lint phase 含む), ECC profile smoke test PASS
 
 この directory は、dotfiles repository 全体の改善計画を、**他の AI agent が単独で実行を引き継げる指示書**として整備したものです。各計画書は task 単位で「目的 / 現状 / 作業手順 / 受け入れ基準 / 検証方法」を持ち、この README が全体の前提・実行規則・依存関係を定義します。
 
@@ -67,6 +68,26 @@ archive/   旧 .bashrc / .inputrc
 9. **detached HEAD 時の silent skip**: `get_current_branch` が空を返すと profile 読み込みが無言で skip される。
 10. **top-level dotfiles の鮮度**: `.zshrc` は oh-my-zsh stock template のコメントが大半 (148 行中実効 32 行)。
 11. **単一 working tree の二役問題**: `~/dotfiles` が「HOME symlink の実体」と「branch を切り替える編集場所」を兼ねるため、`main` へ checkout すると適用中 profile の symlink が dangling になり、その状態で `install.sh` を実行すると prune される。対策として**案A (作業用 worktree 分離) を本計画の正式運用とする** (F6)。`main` などでの作業は `git worktree` で repo 外の作業 directory に出し、`~/dotfiles` 本体は適用中 profile branch に常駐させる。リファクタリングを各 branch へ反映した後の次 task は、構造的解決としての案B (deploy worktree) への移行とする。
+
+## 現状評価の更新 (2026-07-06)
+
+上の初回評価 (2026-06-11) は記録として残し、進捗を踏まえた差分をここにまとめます。Phase 0〜3 は完了済みで、初回評価の弱み 1〜9 と 11 の案A部分は解消しています。
+
+| 初回評価の弱み | 状態 | 対応 task |
+|---|---|---|
+| 1. entrypoint 重複 | 解消 | R1 (`scripts/install/lib/cli.sh`) |
+| 2. logging と counting の混在 / dry-run と verbose の結合 | 解消 | R3, R11 |
+| 3. section summary の before/after 重複 | 解消 | R2 |
+| 4. skipsets.tsv の重複 | 解消 | R8 (`skipset-include`, 117 行 → 65 行) |
+| 5. test-installer.sh の単一巨大ファイル | 解消 | R7 (`tests/harness.sh` + `tests/cases/*.sh`, 40 case) |
+| 6. lint / CI 不在 | 解消 | R5, R6 (shellcheck + GitHub Actions verify) |
+| 7. README の多役化 | 解消 | D2, D5, D6 (README 136 行 + reference 分離) |
+| 8. docs 索引・規約不在 | 解消 | D1, D3 (`docs/README.md`, `docs/development.md`) |
+| 9. detached HEAD の silent skip | 解消 | R9 (警告 + 続行) |
+| 10. top-level dotfiles の鮮度 | 未着手 | F5 (Phase 6) |
+| 11. 単一 working tree の二役問題 | 案A 運用中 | F6 完了。構造的解決は F7 (案B 移行, Phase 4) が残 |
+
+現在の焦点は Phase 4 (branch 反映と F7: 案B deploy worktree への移行) 以降です。あわせて、Phase 0〜3 で docs が 2 本から 12 本へ増えたため、文体・語彙の整備パスを D8 として [01-documentation.md](01-documentation.md) に追加しています。文体の基準は top-level `README.md` の現行の書き方とします。
 
 ## 実行規則 (全 task 共通)
 
