@@ -1,9 +1,17 @@
 # 実装タスク再計画 (Roadmap)
 
-- Last reviewed: 2026-07-06
+- Last reviewed: 2026-08-11
 - 前提: [README.md](README.md) の実行規則、[01-documentation.md](01-documentation.md)、[02-refactoring.md](02-refactoring.md)
 
 この計画書は、リファクタリング (R-tasks)・ドキュメント (D-tasks)・機能拡張 (F-tasks) を依存関係順に統合した実行 roadmap です。top-level README の旧「Future Work」(ECC profile の Claude/Codex 選択適用、main↔profile 同期補助) は F1 / F2 としてここに吸収します。
+
+## 実施記録 (2026-08-11)
+
+commit hash は最終 commit 作成後に補記します。
+
+| Task | 状態 | 証跡 |
+|---|---|---|
+| F7 | 案C により supersede | 設計文書 [design/external-tool-layers.md](design/external-tool-layers.md) を新規作成し、採否判断を同文書に記録。Phase 4-6 と F1・F2・F4・F6 の再編は roadmap 全面改訂 task で実施予定。 |
 
 ## Phase 構成と実行順
 
@@ -210,6 +218,8 @@ README「Branch Strategy」に書かれた「既存 profile を元に別 profile
 ---
 
 ## F7: deploy worktree (案B) への移行
+
+- 2026-08-11 改訂: 案B は案C (external tool layers) により supersede されました。設計は [design/external-tool-layers.md](design/external-tool-layers.md) を参照します。以下の本文は記録として保持します。
 
 - Phase 4 / 優先度: 最高 / 工数: 大 / 依存: リファクタリング反映完了, F6
 - 対象: `docs/improvement-plan/design/deploy-worktree.md` (新規), installer / deploy entrypoint, tests, README / docs
