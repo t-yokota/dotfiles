@@ -1,8 +1,8 @@
 # dotfiles
 
-個人用 dotfiles です。共通で使う設定は `main` に置き、特定のツール構成や生成物が必要な場合は profile branch で管理します。
+個人用 dotfiles です。自分で書いた設定だけを `main` に置き、`main` をそのまま実 HOME に適用します。
 
-このリポジトリは単なる設定ファイルの置き場ではなく、自分の作業環境で様々なポリシーを切り替えながら試すことができる土台になっています。特に AI agent のツールはベストプラクティスが変わり続ける可能性があるため、ベースは薄く保ち、特定ツールとの連携や AI agent 用の profile 自体は branch / manifest の単位で切りながら扱います。
+このリポジトリは単なる設定ファイルの置き場ではなく、自分の作業環境で様々なポリシーを切り替えながら試すことができる土台になっています。特に AI agent のツールはベストプラクティスが変わり続けるため、管理対象は薄く保ちます。外部 tool が生成・配布する skill や rule 群は commit せず、必要ならその tool の plugin 機構で導入します。
 
 `.claude/`, `.codex/`, `.agents/` 等のディレクトリには各ツールの runtime state が含まれるため、本 dotfiles では managed root として扱います。root 全体を HOME に symlink せず、credential、cache、session などの runtime state は実 HOME 側に残した上で、再現したい desired state だけを dotfiles 側で管理します。
 
@@ -20,42 +20,25 @@
 
 ## Branch Strategy
 
-`main` は portable な base branch です。共通 dotfiles、共通 installer、共通 ignore rule を置きます。
+`~/dotfiles` 本体は `main` に常駐させ、`main` の desired state を実 HOME に適用します。`profiles/base/` はすべての branch で有効な profile で、`.claude/` と `.codex/` の個人設定を HOME へ link します。
 
-profile branch は、共通 dotfiles だけでは足りず、かつ `main` に固定せず切り替えたい構成を扱います。profile 固有の dotfile 本体だけでなく、特定のツールを使って dotfile 群を構成するための手順書や補助 script も配置できます。
+`main` は直接編集してかまいません。実験用の branch を試したい場合は repo 外の `git worktree` で作業し、`DOTPATH` を worktree に向けて `install.sh` を実行しません。詳しくは [docs/worktree-workflow.md](docs/worktree-workflow.md) を参照します。
 
-具体的には、次のような branch 構成を基本形にします。
+以前は `main` → `profile/ecc-base` → `profile/ecc/<environment>` の branch 積層で ECC の生成物を管理していました。この構成は [docs/improvement-plan/design/slim-base.md](docs/improvement-plan/design/slim-base.md) の方針で廃止し、旧 branch は `archive/` 配下に残しています。
 
-```text
-main
-profile/<name>-base
-profile/<name>/<environment>
-```
-
-### profile branch
-
-`profile/*-base` branch には profile の共通構造と手順を配置し、できるだけ portable に保ちます。特定のツールを実行して profile の実体を構築する場合や、local path を含む生成物や machine-local な marker を環境ごとに保持する場合は、`*-base` branch から環境用 branch を切り、その branch 上でツールを実行します。
-
-たとえば [ECC](https://github.com/affaan-m/ECC) 用の profile では、`profile/ecc-base` に ECC の導入手順、profile manifest、installer 連携用の補助 script を置きます。`profile/ecc/<environment>` で ECC installer / sync を実行して Claude / Codex 用の desired state を生成し、その後 dotfiles の `bash install.sh` で実 HOME へ symlink します。machine-local な marker は環境側に保持し、Git には commit しません。
-
-`~/dotfiles` 本体は、実 HOME に適用中の profile branch に常駐させます。`main` や `profile/ecc-base` の編集・commit 作業は repo 外の `git worktree` で行い、`DOTPATH` を worktree に向けて `install.sh` を実行しません。
-
-共通資産を適用環境へ取り込むときは、本体 checkout を適用 branch に乗せたまま merge し、必要に応じて `bash install.sh` を再実行します。詳しい手順と復旧方法は [docs/worktree-workflow.md](docs/worktree-workflow.md) を参照します。
-
-
-既存 profile を元に別 profile を作る場合は、`profile/<name>-base` またはその派生 branch にある `profiles/<name>/` を profile の資産として一式コピーします。profile の枠組みを定義する `profile.tsv`, `surfaces.tsv`, `skipsets.tsv`, `checks.d/` だけでなく、`bin/` に置いた profile-local な補助 script や smoke test も移植対象です。具体的な作成・検証手順は [docs/development.md](docs/development.md) を参照します。
+別の profile を追加する場合は、`profiles/<name>/` に `profile.tsv`, `surfaces.tsv`, `skipsets.tsv`, 必要なら `checks.d/` と `bin/test-profile.sh` を置きます。具体的な作成・検証手順は [docs/development.md](docs/development.md) を参照します。
 
 ## Repository Layout
 
-このリポジトリでは Branch Strategy に従い、portable な top-level dotfiles、共通 installer、profile branch 固有の manifest / check / 補助 script などを管理します。
+このリポジトリでは、portable な top-level dotfiles、共通 installer、profile manifest、agent tool の個人設定を管理します。
 
 | Path | Role |
 |---|---|
 | `install.sh`, `uninstall.sh`, `status.sh` | この dotfiles の entrypoint。HOME へ symlink する / symlink を外す / symlink の状態を確認する。 |
 | `scripts/install/lib/` | CLI bootstrap、profile manifest loader、reconcile engine、status reporter。 |
 | `scripts/install/test-*.sh` | 実 HOME を触らない regression / profile smoke test。 |
-| `profiles/<name>/` | `profile/<name>-base` とその派生 branch に置く `profile.tsv`, `surfaces.tsv`, `skipsets.tsv`, `checks.d/`, `bin/`。 |
-| `.claude/`, `.codex/`, `.agents/` | managed root。root 全体ではなく、profile manifest の surface 単位で HOME に出す。 |
+| `profiles/<name>/` | `profile.tsv`, `surfaces.tsv`, `skipsets.tsv`, `checks.d/`, `bin/`。`profiles/base/` は全 branch で有効。 |
+| `.claude/`, `.codex/` | managed root。自分で書いた agent tool の設定だけを置き、profile manifest の surface 単位で HOME に出す。 |
 | `docs/` | 詳細な仕様・手順・reference。索引は [docs/README.md](docs/README.md)。 |
 
 installer を変更する場合は、構成とテスト追加手順を [docs/development.md](docs/development.md) で確認します。
@@ -112,7 +95,7 @@ managed dotfile surface は、managed root 配下にある source を、実 HOME
 
 ### Profile Manifest Schema
 
-manifest schema の詳細は [docs/reference/profile-manifest.md](docs/reference/profile-manifest.md) に分離しています。ここでは `profile/<name>-base` およびその派生 branch に配置する最小構造だけを示します。
+manifest schema の詳細は [docs/reference/profile-manifest.md](docs/reference/profile-manifest.md) に分離しています。ここでは `profiles/<name>/` に配置する最小構造だけを示します。
 
 ```text
 profile.tsv    profile を有効にする branch pattern と、使用する manifest / check の path

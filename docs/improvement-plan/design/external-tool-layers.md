@@ -1,7 +1,9 @@
 # External Tool Layers Design (案C)
 
-- Last reviewed: 2026-08-11
+- Last reviewed: 2026-09-26
 - 前提: [README.md](../README.md) の実行規則、[03-roadmap.md](../03-roadmap.md) の F7、[profile-manifest.md](../../reference/profile-manifest.md)、[worktree-workflow.md](../../worktree-workflow.md)、ecc-dotfiles-lifecycle.md (profile branch 系にのみ存在)
+
+> **Superseded (2026-09-26)**: 外部 tool が plugin として配布されるようになったため、本設計は実装しません。後継は [slim-base.md](slim-base.md) (案D) です。本文は履歴として残します。
 
 この文書は、dotfiles を `main` 一本で管理し、ECC などの外部 tool が作る desired state を repo 外の source layer として適用する設計を定義します。生成物の vendoring と branch 積層が生む更新・適用コストをなくし、既存 installer の manifest と安全規則を複数 source root へ一般化します。本文書は [03-roadmap.md](../03-roadmap.md) の F7 が予定していた案B deploy worktree 設計文書の代替です。
 

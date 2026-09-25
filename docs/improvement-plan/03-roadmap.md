@@ -1,6 +1,6 @@
 # 実装タスク再計画 (Roadmap)
 
-- Last reviewed: 2026-08-11
+- Last reviewed: 2026-09-26
 - 前提: [README.md](README.md) の実行規則、[01-documentation.md](01-documentation.md)、[02-refactoring.md](02-refactoring.md)
 
 この計画書は、リファクタリング (R-tasks)・ドキュメント (D-tasks)・機能拡張 (F-tasks) を依存関係順に統合した実行 roadmap です。top-level README の旧「Future Work」(ECC profile の Claude/Codex 選択適用、main↔profile 同期補助) は F1 / F2 としてここに吸収します。
@@ -12,6 +12,7 @@ commit hash は最終 commit 作成後に補記します。
 | Task | 状態 | 証跡 |
 |---|---|---|
 | F7 | 案C により supersede | 設計文書 [design/external-tool-layers.md](design/external-tool-layers.md) を新規作成し、採否判断を同文書に記録。Phase 4-6 と F1・F2・F4・F6 の再編は roadmap 全面改訂 task で実施予定。 |
+| 案C | 案D により supersede (2026-09-26) | 設計文書 [design/slim-base.md](design/slim-base.md) を新規作成。ECC は導入せず、`main` 一本に個人設定だけを置く。F1・F2・F4 は不要または中止、F6 は任意に降格、F3 は保留。処遇の一覧は同文書の Roadmap Impact を参照。 |
 
 ## Phase 構成と実行順
 
