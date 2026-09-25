@@ -5,7 +5,6 @@ on:
   push:
     branches:
       - main
-      - profile/**
       - integrate/**
   pull_request:
 
@@ -18,7 +17,6 @@ jobs:
       matrix:
         branch:
           - main
-          - profile/ecc-base
 
     steps:
       - name: Checkout
