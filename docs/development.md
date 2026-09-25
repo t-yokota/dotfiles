@@ -4,6 +4,8 @@
 
 この guide は、common installer (`install.sh`, `uninstall.sh`, `status.sh`, `scripts/install/`) を変更する人と agent 向けの開発メモです。実 HOME を直接使わず、fixture と dry-run で安全に検証する前提で書いています。
 
+profile manifest (`profile.tsv`, `surfaces.tsv`, `skipsets.tsv`, `checks.d/`) の列形式と規則は [reference/profile-manifest.md](reference/profile-manifest.md)、`status.sh` の分類は [reference/status-classification.md](reference/status-classification.md) にまとめています。この guide は、それらを実装・検証する側の説明です。
+
 ## Architecture
 
 top-level entrypoint は共通して次の順で動きます。
@@ -39,9 +41,9 @@ library の責務境界は次の通りです。
 |---|---|
 | `common.sh` | policy を持たない shared helper、path helper、logging、summary counter。 |
 | `cli.sh` | top-level entrypoint 共通の option parsing と bootstrap。 |
-| `profile.sh` | profile manifest 読み込み、schema validation、branch matching、profile check 実行。 |
+| `profile.sh` | profile manifest 読み込み、schema validation、branch matching、profile check 実行。schema は [reference/profile-manifest.md](reference/profile-manifest.md)。 |
 | `reconcile.sh` | HOME への書き込みを伴う conflict check、cleanup、symlink 作成・削除。 |
-| `status.sh` | read-only の link inventory 照合。HOME へ書き込まない。 |
+| `status.sh` | read-only の link inventory 照合。HOME へ書き込まない。分類は [reference/status-classification.md](reference/status-classification.md)。 |
 
 ## Bash Rules
 
@@ -69,6 +71,8 @@ dry-run と verbose は別軸です。`--dry-run` は書き込み判定と summa
 実 HOME を直接変更する test は書きません。実 HOME に対して確認したい場合は `bash install.sh --dry-run`, `bash uninstall.sh --dry-run`, `bash status.sh` に留めます。
 
 ## Adding or Copying a Profile
+
+各 file の列、surface の `entries` / `whole` の違い、child surface や skipset の規則は [reference/profile-manifest.md](reference/profile-manifest.md) を参照します。最小構成の実例は `profiles/base/` です。
 
 既存 profile を元に別 profile を作る場合は、`profiles/<name>/` を一式コピーします。`profile.tsv`, `surfaces.tsv`, `skipsets.tsv`, `checks.d/` に加えて、`bin/` に置いた profile-local な補助 script や smoke test も移植対象です。
 
@@ -128,7 +132,7 @@ manifest schema を変える場合は、先に `60-manifest-validation.sh` に R
 - entrypoint option を変えたら `--help` と unknown option の test を更新する。
 - log 文言を変えたら、その文言を assert する regression case を同時に更新する。
 - counter を変えたら dry-run / status の summary 件数を確認する。
-- manifest schema を変えたら validation、regression test、reference、README を同時に更新する。
+- manifest schema を変えたら validation、regression test、[reference/profile-manifest.md](reference/profile-manifest.md)、README を同時に更新する。
 - HOME への書き込み範囲を広げない。未管理通常 file は上書きしない。
 - cleanup / uninstall の対象は、この checkout を指す managed symlink に限定する。
 - 最後に `bash scripts/install/test-all.sh`, `bash install.sh --dry-run`, `bash uninstall.sh --dry-run`, `bash status.sh`, `git diff --check` を実行する。
