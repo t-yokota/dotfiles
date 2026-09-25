@@ -2,11 +2,9 @@
 
 個人用 dotfiles です。自分で書いた設定だけを `main` に置き、`main` をそのまま実 HOME に適用します。
 
-このリポジトリは単なる設定ファイルの置き場ではなく、自分の作業環境で様々なポリシーを切り替えながら試すことができる土台になっています。特に AI agent のツールはベストプラクティスが変わり続けるため、管理対象は薄く保ちます。外部 tool が生成・配布する skill や rule 群は commit せず、必要ならその tool の plugin 機構で導入します。
+AI agent のツールはベストプラクティスが変わり続けるため、管理対象は薄く保ちます。外部 tool が生成・配布する skill や rule 群は commit せず、必要ならその tool の plugin 機構で導入します。設定の変更や試行錯誤は git の履歴として残します。
 
-`.claude/`, `.codex/`, `.agents/` 等のディレクトリには各ツールの runtime state が含まれるため、本 dotfiles では managed root として扱います。root 全体を HOME に symlink せず、credential、cache、session などの runtime state は実 HOME 側に残した上で、再現したい desired state だけを dotfiles 側で管理します。
-
-これにより、ベストプラクティスへの追従、複数の policy の切り替え、試行錯誤を git の履歴として扱えるようにします。
+`.claude/` と `.codex/` には各ツールの runtime state も置かれるため、本 dotfiles では managed root として扱います。root 全体を HOME に symlink せず、credential、cache、session などの runtime state は実 HOME 側に残した上で、再現したい desired state だけを dotfiles 側で管理します。
 
 ## Contents
 
@@ -14,6 +12,7 @@
 - [Repository Layout](#repository-layout)
 - [Agent Tool Policy](#agent-tool-policy)
 - [Installer Flow](#installer-flow)
+- [New Machine Setup](#new-machine-setup)
 - [How to Install](#how-to-install)
 - [Managed Dotfile Surfaces](#managed-dotfile-surfaces)
 - [Safety Rules](#safety-rules)
@@ -66,9 +65,30 @@ Claude Code / Codex などの agent tool については、次の方針で管理
 
 `.git`, `.github`, `.gitignore`, `.gitconfig.local`, `.claude`, `.codex`, `.agents` は top-level symlink 対象から外します。`.claude`, `.codex`, `.agents` は managed root として扱い、profile が有効な場合だけ surface 定義に従って必要な entry を HOME に出します。
 
+## New Machine Setup
+
+`install.sh` は symlink を張るだけで、tool 本体は入れません。先に次を用意します。oh-my-zsh が無い場合、theme の link は黙って skip されるため、後から入れたら `bash install.sh` を再実行します。
+
+| Tool | 使う場所 |
+|---|---|
+| zsh, [oh-my-zsh](https://ohmyz.sh/) | `.zshrc`、`my.zsh-theme` の link 先 `~/.oh-my-zsh/themes/` |
+| [mise](https://mise.jdx.dev/) | `.zshrc` の runtime 管理 |
+| [bun](https://bun.sh/) | Claude Code の statusline (`bun x ccusage`)、Codex の MCP server (`bunx`) |
+| `gh` (認証済み) | Codex の GitHub MCP server の token 取得 |
+
+```bash
+git clone https://github.com/t-yokota/dotfiles.git ~/dotfiles
+cd ~/dotfiles
+bash install.sh --dry-run
+bash install.sh
+bash status.sh
+```
+
+machine 固有の git 設定 (credential helper など) は、`.gitconfig` から include される `~/.gitconfig.local` に書きます。このファイルは HOME 側の実ファイルで、dotfiles には含めません。
+
 ## How to Install
 
-適用したい branch を checkout した状態で、Bash から installer を実行します。`install.sh` は Bash 前提のため、`sh install.sh` では実行せず、誤って Bash 以外から起動された場合は早期に終了します。
+`main` を checkout した状態で、Bash から installer を実行します。`install.sh` は Bash 前提のため、`sh install.sh` では実行せず、誤って Bash 以外から起動された場合は早期に終了します。
 
 ```bash
 cd ~/dotfiles
