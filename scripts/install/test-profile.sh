@@ -30,7 +30,7 @@ usage() {
 Usage: bash scripts/install/test-profile.sh --profile profiles/<name> [--branch <branch>] [--verbose] [--keep-tmp]
 
 Options:
-  --profile <dir>    Profile directory to test, such as profiles/ecc.
+  --profile <dir>    Profile directory to test, such as profiles/base.
   --branch <branch>  Test the profile as if this dotfiles branch were checked out.
   -v, --verbose      Print captured install.sh logs.
   --keep-tmp         Keep the temporary HOME fixture for inspection.

@@ -12,11 +12,11 @@
 
 - [Branch Strategy](#branch-strategy)
 - [Repository Layout](#repository-layout)
+- [Agent Tool Policy](#agent-tool-policy)
 - [Installer Flow](#installer-flow)
 - [How to Install](#how-to-install)
 - [Managed Dotfile Surfaces](#managed-dotfile-surfaces)
 - [Safety Rules](#safety-rules)
-- [Roadmap](#roadmap)
 
 ## Branch Strategy
 
@@ -24,7 +24,7 @@
 
 `main` は直接編集してかまいません。実験用の branch を試したい場合は repo 外の `git worktree` で作業し、`DOTPATH` を worktree に向けて `install.sh` を実行しません。詳しくは [docs/worktree-workflow.md](docs/worktree-workflow.md) を参照します。
 
-以前は `main` → `profile/ecc-base` → `profile/ecc/<environment>` の branch 積層で ECC の生成物を管理していました。この構成は [docs/improvement-plan/design/slim-base.md](docs/improvement-plan/design/slim-base.md) の方針で廃止し、旧 branch は `archive/` 配下に残しています。
+以前は `main` → `profile/ecc-base` → `profile/ecc/<environment>` の branch 積層で ECC の生成物を管理していました。この構成は 2026-09-26 に廃止し、旧 branch は `archive/` 配下に残しています。旧構成を適用している PC の移行手順は [docs/migration-from-ecc.md](docs/migration-from-ecc.md) を参照します。
 
 別の profile を追加する場合は、`profiles/<name>/` に `profile.tsv`, `surfaces.tsv`, `skipsets.tsv`, 必要なら `checks.d/` と `bin/test-profile.sh` を置きます。具体的な作成・検証手順は [docs/development.md](docs/development.md) を参照します。
 
@@ -42,6 +42,21 @@
 | `docs/` | 詳細な仕様・手順・reference。索引は [docs/README.md](docs/README.md)。 |
 
 installer を変更する場合は、構成とテスト追加手順を [docs/development.md](docs/development.md) で確認します。
+
+## Agent Tool Policy
+
+Claude Code / Codex などの agent tool については、次の方針で管理します。
+
+- dotfiles が管理するのは、自分で書いた設定だけです。外部 tool が生成・配布する skill、rule、agent 定義は commit しません。
+- 外部 tool を使うときは、その tool の plugin 機構で入れます。常時有効にせず、必要な project の local scope で有効にすることを優先します。
+- 指示ファイルは短く保ちます。追加するのは「2 回間違えたこと」だけで、必ず守らせたいものは hook や設定で強制します。rules は置かず、必要になったら `paths:` 付きで追加します。
+
+| Path | 内容 |
+|---|---|
+| `.claude/CLAUDE.md`, `.codex/AGENTS.md` | 全 session に読み込まれる個人の好み。 |
+| `.claude/settings.json`, `.codex/config.toml` | model、permission、MCP server などの個人設定。 |
+| `.claude/skills/<name>/` | 自作 skill。`~/.claude/skills/` は実 directory のまま保ち、skill 単位で link します。 |
+| `.codex/agents/*.toml` | Codex の subagent 定義。 |
 
 ## Installer Flow
 
@@ -113,7 +128,3 @@ checks.d/      profile 適用前に実行する branch-specific check
 - cleanup は、この dotfiles checkout を指す symlink だけを削除します。
 - `entries` surface の link 先 directory と `whole` surface の親 directory は、通常 directory である必要があります。未管理 symlink 越しには書き込みません。
 - credential、cache、backup、machine-local config といった local / runtime state は shared commit に含めません。
-
-## Roadmap
-
-今後の改善候補は [docs/improvement-plan/03-roadmap.md](docs/improvement-plan/03-roadmap.md) に集約します。共通 dotfiles 基盤、profile 固有の改善、案B deploy worktree 移行、将来の profile 補助 script は roadmap の Phase 順で扱います。
