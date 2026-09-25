@@ -1,0 +1,54 @@
+# kind	name	pattern
+
+# Child surface source entries are skipped implicitly by the installer.
+# The skipsets below list runtime/local state that should stay HOME-local.
+
+# Reusable runtime and credential groups.
+skipset	common-runtime	logs
+skipset	common-runtime	backups
+skipset	common-runtime	cache
+skipset	common-runtime	caches
+skipset	common-runtime	tmp
+skipset	common-runtime	*.log
+skipset	common-runtime	*.db
+skipset	common-runtime	*.sqlite
+skipset	common-runtime	*.sqlite-wal
+skipset	common-runtime	*.sqlite-shm
+
+skipset	credential-state	.credentials.json
+skipset	credential-state	credentials.json
+skipset	credential-state	config.json
+skipset	credential-state	models_cache.json
+skipset	credential-state	session_index.jsonl
+
+skipset	plugin-state	plugins
+skipset	plugin-state	plugin-cache
+
+# .claude root: local lifecycle/runtime state.
+skipset-include	claude-root	common-runtime
+skipset-include	claude-root	credential-state
+skipset-include	claude-root	plugin-state
+skipset	claude-root	projects
+skipset	claude-root	session*
+skipset	claude-root	history.jsonl
+skipset	claude-root	statsig
+skipset	claude-root	todos
+# Project-local settings of this repository itself; never a HOME-level file.
+skipset	claude-root	settings.local.json
+# Leftover ECC install state kept (ignored) in the checkout for archive-branch rollback.
+skipset	claude-root	ecc
+
+# .claude/skills root: local runtime state.
+skipset-include	claude-skills-root	common-runtime
+
+# .codex root: local runtime state.
+skipset-include	codex-root	common-runtime
+skipset-include	codex-root	credential-state
+skipset-include	codex-root	plugin-state
+skipset	codex-root	auth.json
+skipset	codex-root	sessions
+skipset	codex-root	git-hooks
+skipset	codex-root	ecc-install-state.json
+skipset	codex-root	dotfiles-*-sync-state.json
+skipset	codex-root	history.jsonl
+

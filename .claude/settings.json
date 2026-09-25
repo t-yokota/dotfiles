@@ -33,7 +33,7 @@
     ],
     "defaultMode": "auto"
   },
-  "model": "opus",
+  "enableWorkflows": true,
   "statusLine": {
     "type": "command",
     "command": "bun x ccusage statusline"
@@ -41,5 +41,15 @@
   "enabledPlugins": {
     "claude-code-setup@claude-plugins-official": true
   },
-  "autoCompactEnabled": true
+  "effortLevel": "xhigh",
+  "advisorModel": "fable",
+  "tui": "fullscreen",
+  "autoCompactEnabled": true,
+  "remoteControlAtStartup": false,
+  "agentPushNotifEnabled": true,
+  "modelSettings": {
+    "claude-opus-5-5": {
+      "effortLevel": "high"
+    }
+  }
 }

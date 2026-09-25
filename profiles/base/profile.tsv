@@ -1,0 +1,5 @@
+# kind	value
+# base is active on every branch; archived profile branches do not carry this directory.
+branch	*
+surfaces	surfaces.tsv
+skipsets	skipsets.tsv

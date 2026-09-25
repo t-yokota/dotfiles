@@ -1,0 +1,10 @@
+# kind	strategy	source	dest	skipset	label
+
+# Personal Claude Code config. skills stays a real HOME directory so
+# HOME-local skills (for example `claude plugin init` scaffolds) never land in the repo.
+surface	entries	.claude	.claude	claude-root	Claude Code root config
+surface	entries	.claude/skills	.claude/skills	claude-skills-root	Claude personal skills
+
+# Personal Codex config.
+surface	entries	.codex	.codex	codex-root	Codex root config
+surface	entries	.codex/agents	.codex/agents	none	Codex agent roles
