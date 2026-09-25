@@ -11,7 +11,7 @@
 |---|---|---|
 | 方針決定 | 完了 | ユーザー合意。ECC は導入しない。 |
 | `main` に base profile と個人設定を追加 | 完了 | `bash scripts/install/test-all.sh --branch main` 全 PASS。 |
-| 実 HOME の cutover | 完了 | `uninstall.sh` (旧 link 510 本を削除) → `git switch main` → `install.sh` (13 本を link)。`status.sh` は linked 13 / missing・conflicts・stale・orphaned 0。空になった ECC 用 directory (`~/.claude/rules`, `~/.claude/skills/ecc`, `~/.claude/.agents`, `~/.codex/prompts`, `~/.agents`) を削除。 |
+| 実 HOME の cutover | 完了 | `uninstall.sh` (旧 link 510 本を削除) → `git switch main` → `install.sh` (13 本を link)。`status.sh` は linked 13 / missing・conflicts・stale・orphaned 0。空になった ECC 用 directory (`~/.claude/rules`, `~/.claude/skills/ecc`, `~/.claude/.agents`, `~/.codex/prompts`, `~/.agents`) を削除。`~/.gitconfig.local` の `core.hooksPath` (ECC の git hook を全 repo に適用していた) を削除。 |
 | 旧 branch の archive | 完了 | `archive/profile/ecc-base`, `archive/profile/ecc/full/home-9M2KERO` へ rename (local のみ、未 push)。旧 worktree 2 つを削除。 |
 
 ## Background
@@ -106,7 +106,7 @@ installer 本体の変更はありません。profile は既存どおり `profil
 6. 残骸を片付けます。
     - 空になった ECC 用 directory を削除します: `find ~/.claude/skills/ecc ~/.claude/rules ~/.claude/.agents ~/.codex/prompts ~/.agents -depth -type d -empty -delete`
     - ECC を plugin として入れていた場合は、`claude plugin list` で確認し、`claude plugin uninstall ecc@ecc` で外します。
-    - `git config --global --get core.hooksPath` が ECC の hook directory を指していれば、`git config --global --unset core.hooksPath` で外します。
+    - `git config --show-origin --get core.hooksPath` が ECC の hook directory (`~/dotfiles/.codex/git-hooks` など) を指していれば、表示された設定ファイルから外します。ECC は machine-local な `~/.gitconfig.local` に書き込んでいることがあり、`--global` を付けると include 先が読まれず見落とします。例: `git config --file ~/.gitconfig.local --unset core.hooksPath`
     - checkout 内の ignored な ECC state (`.claude/ecc/`, `.codex/*sync-state.json`, `.codex/git-hooks/` など) は、rollback に使うため残します。
 
 7. Claude Code と Codex を再起動し、Claude では `/context` を実行して、常時ロードされる memory が `~/.claude/CLAUDE.md` だけであることを確認します。
