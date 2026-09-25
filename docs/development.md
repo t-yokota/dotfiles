@@ -4,7 +4,9 @@
 
 この guide は、common installer (`install.sh`, `uninstall.sh`, `status.sh`, `scripts/install/`) を変更する人と agent 向けの開発メモです。実 HOME を直接使わず、fixture と dry-run で安全に検証する前提で書いています。
 
-profile manifest (`profile.tsv`, `surfaces.tsv`, `skipsets.tsv`, `checks.d/`) の列形式と規則は [reference/profile-manifest.md](reference/profile-manifest.md)、`status.sh` の分類は [reference/status-classification.md](reference/status-classification.md) にまとめています。この guide は、それらを実装・検証する側の説明です。
+installer は、top-level dotfile (`.zshrc` など) を HOME に丸ごと link するほか、`.claude/` や `.codex/` のように runtime state が混在する directory (managed root) については、`profiles/<name>/` の profile に宣言された entry だけを link します。profile は、有効になる branch、link する範囲 (surface)、HOME 側に残す entry (skipset)、適用前の検査 (check) を TSV で宣言したもので、この TSV 群を profile manifest と呼びます。用語の説明は [reference/profile-manifest.md の Concepts](reference/profile-manifest.md#concepts) を参照します。
+
+profile manifest の列形式と規則は [reference/profile-manifest.md](reference/profile-manifest.md)、`status.sh` の分類は [reference/status-classification.md](reference/status-classification.md) にまとめています。この guide は、それらを実装・検証する側の説明です。
 
 ## Architecture
 

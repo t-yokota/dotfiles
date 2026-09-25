@@ -130,7 +130,7 @@ managed dotfile surface は、managed root 配下にある source を、実 HOME
 
 ### Profile Manifest Schema
 
-manifest schema の詳細は [docs/reference/profile-manifest.md](docs/reference/profile-manifest.md) に分離しています。ここでは `profiles/<name>/` に配置する最小構造だけを示します。
+profile は、surface・skipset・適用前 check と、それが有効になる branch をまとめた宣言一式です。用語の説明は [docs/reference/profile-manifest.md の Concepts](docs/reference/profile-manifest.md#concepts)、manifest schema の詳細は同じ文書に分離しています。ここでは `profiles/<name>/` に配置する最小構造だけを示します。
 
 ```text
 profile.tsv    profile を有効にする branch pattern と、使用する manifest / check の path

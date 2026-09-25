@@ -1,8 +1,30 @@
 # Profile Manifest Reference
 
-- Last reviewed: 2026-06-14
+- Last reviewed: 2026-09-26
 
 この reference は、common installer が読む `profiles/<name>/` 配下の manifest schema を定義します。manifest はすべて tab 区切りの TSV です。空行と `#` で始まる行は無視され、CRLF 行末は読み込み時に正規化されます。余分な列・未知の kind・壊れた path は symlink 作成前に `file:line` 付き error として停止します。
+
+## Concepts
+
+`.claude/` や `.codex/` には、自分で管理したい設定 (`CLAUDE.md`, `settings.json` など) と、tool 自身が書き込む credential・cache・session が同じ directory に混在します。directory を丸ごと HOME に symlink すると runtime state まで repo に入ってしまうため、installer はこれらを managed root として特別扱いし、「どの entry を HOME に link し、どれを HOME 側に残すか」を宣言した manifest に従って link します。この宣言一式が profile です。
+
+| 用語 | 意味 |
+|---|---|
+| managed root | `.claude`, `.codex`, `.agents`。top-level dotfile として丸ごと link せず、surface 単位で扱う directory。 |
+| profile | `profiles/<name>/` に置く宣言一式。どの branch で有効になり (`profile.tsv`)、何を link し (`surfaces.tsv`)、何を HOME 側に残し (`skipsets.tsv`)、適用前に何を検査するか (`checks.d/`) をまとめたもの。 |
+| profile manifest | profile を構成する上記の TSV file 群。 |
+| active profile | `profile.tsv` の branch pattern が現在の branch に一致した profile。installer は一致した profile をすべて読み、surface を合算します。一致する profile が無い場合、managed root は HOME に link されません。 |
+| surface | 「managed root 配下の source を、HOME のどこへ、`entries` (直下の entry ごと) と `whole` (丸ごと) のどちらで link するか」を表す 1 行。 |
+| skipset | `entries` surface で link せず HOME 側に残す entry 名 pattern の集まり。`sessions`, `*.log`, `.credentials.json` など。 |
+| check | install 前に実行する script。前提が揃っていなければ、HOME に書き込む前に install を止めます。 |
+
+実例として、`profiles/base/` は全 branch で有効 (`branch *`) で、次のように働きます。
+
+```text
+surfaces.tsv:  .claude         entries → ~/.claude/CLAUDE.md, ~/.claude/settings.json を個別に link
+               .claude/skills  entries → ~/.claude/skills/<name> を skill ごとに link
+skipsets.tsv:  claude-root     → projects, sessions, .credentials.json などは link せず HOME 側に残す
+```
 
 ## Files
 
