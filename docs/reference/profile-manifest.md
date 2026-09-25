@@ -13,7 +13,7 @@
 | managed root | `.claude`, `.codex`, `.agents`。top-level dotfile として丸ごと link せず、surface 単位で扱う directory。 |
 | profile | `profiles/<name>/` に置く宣言一式。どの branch で有効になり (`profile.tsv`)、何を link し (`surfaces.tsv`)、何を HOME 側に残し (`skipsets.tsv`)、適用前に何を検査するか (`checks.d/`) をまとめたもの。 |
 | profile manifest | profile を構成する上記の TSV file 群。 |
-| active profile | `profile.tsv` の branch pattern が現在の branch に一致した profile。installer は一致した profile をすべて読み、surface を合算します。一致する profile が無い場合、managed root は HOME に link されません。 |
+| active profile | `profile.tsv` の branch pattern が現在の branch に一致した profile。installer は一致した profile をすべて読み、surface を合算します。一致する profile が無い場合、managed root は HOME に link されません。branch は `git branch --show-current` で判定し、環境変数 `DOTFILES_BRANCH` があればそちらを優先します。branch を判定できない場合 (detached HEAD など) は警告を出し、active profile なしとして続行します。 |
 | surface | 「managed root 配下の source を、HOME のどこへ、`entries` (直下の entry ごと) と `whole` (丸ごと) のどちらで link するか」を表す 1 行。 |
 | skipset | `entries` surface で link せず HOME 側に残す entry 名 pattern の集まり。`sessions`, `*.log`, `.credentials.json` など。 |
 | check | install 前に実行する script。前提が揃っていなければ、HOME に書き込む前に install を止めます。 |
@@ -35,7 +35,7 @@ profiles/<name>/skipsets.tsv
 profiles/<name>/checks.d/*.sh
 ```
 
-active profile の `profile.tsv` だけが必須です。`surfaces.tsv`, `skipsets.tsv`, `checks.d` は `profile.tsv` で別 path を指定できます。`surfaces.tsv` / `skipsets.tsv` が存在しない場合、その file は空として扱われます。
+active profile の `profile.tsv` だけが必須です。`surfaces.tsv`, `skipsets.tsv`, `checks.d` は `profile.tsv` で別 path を指定できます。`surfaces.tsv` / `skipsets.tsv` が存在しない場合、installer はその file を空として扱います。ただし profile smoke test (`test-profile.sh`) は両 file の存在を要求します。
 
 ## profile.tsv
 
@@ -60,7 +60,7 @@ active profile の `profile.tsv` だけが必須です。`surfaces.tsv`, `skipse
 
 `<skipset-name>` は `skipsets.tsv` に定義された名前、または skip しない場合の `none` です。`<label>` は log 表示用の説明で、space は使えますが tab は列区切りです。
 
-active profile の surface source root は top-level dotfile link 対象から予約除外されます。たとえば `.codex` 配下に surface がある場合、top-level `.codex` directory 自体は HOME へ symlink されません。
+managed root (`.claude`, `.codex`, `.agents`) は、active profile の有無にかかわらず top-level dotfile link の対象から常に除外されます。managed root を HOME に出す手段は surface だけです。
 
 child surface の source entry は親 `entries` surface では implicit skip されます。たとえば `.codex` と `.codex/items` の両方を surface として定義した場合、`.codex/items` entry は親 `.codex` の個別 symlink 対象から外れ、child surface 側で扱われます。
 
@@ -78,7 +78,7 @@ child surface の source entry は親 `entries` surface では implicit skip さ
 - `<include-name>` はその行より前に定義済みである必要があります。前方参照は invalid です。
 - `<name>` は未定義でも構いません。include 行で known skipset になります。
 - 自己 include、循環 include、同じ `<name>` から同じ `<include-name>` への重複 include は invalid です。
-- installer は読み込み時に include を展開し、最終的には従来通りフラットな pattern list として判定します。
+- installer は読み込み時に include を展開し、最終的にはフラットな pattern list として判定します。
 
 ## checks.d
 
@@ -89,9 +89,7 @@ check-*.sh
 [0-9][0-9]-*.sh
 ```
 
-check は glob 順に実行されます。順序を明示したい場合は `10-local-state.sh`, `20-conflicts.sh` のように番号 prefix を付けます。check は `DOTPATH` と `DOTFILES_BRANCH` を受け取り、非 0 exit で install を停止します。
-
-branch を検出できない場合 (detached HEAD など) は警告を出し、active profile なしとして続行します。
+check は glob 順に実行されます。順序を明示したい場合は `10-local-state.sh`, `20-conflicts.sh` のように番号 prefix を付けます。check は `DOTPATH` と `DOTFILES_BRANCH` を受け取ります。すべての check を実行したあと、1 つでも非 0 exit があれば HOME に書き込む前に install を停止します。
 
 ## Error Conditions
 

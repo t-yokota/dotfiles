@@ -1,6 +1,6 @@
 # Status Classification Reference
 
-- Last reviewed: 2026-06-14
+- Last reviewed: 2026-09-26
 
 `status.sh` は実 HOME に書き込まず、現在の `DOTPATH` と active profile の desired state を実 HOME の symlink 状態と照合します。この文書は `status.sh` が出す linked / missing / conflicts / stale / orphaned / skipped の分類を、実装に合わせて定義します。
 
@@ -10,7 +10,7 @@
 
 | Scope | 判定対象 |
 |---|---|
-| Top-level dotfiles | `DOTPATH` 直下の `.??*` のうち、installer の reserved entry ではないもの |
+| Top-level dotfiles | `DOTPATH` 直下の `.??*` のうち、`.git`, `.github`, `.gitignore`, `.gitconfig.local` と managed root を除いたもの |
 | Managed surfaces | active profile の `surfaces.tsv` が定義する `entries` / `whole` surface |
 | Shell themes | `DOTPATH` 直下の `*.zsh-theme` と `OH_MY_ZSH_THEMES` |
 | Unexpected managed links | `HOME` 直下、managed root 配下、active surface の destination、shell theme directory 内の dotfiles-managed symlink |

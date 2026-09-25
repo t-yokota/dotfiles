@@ -23,13 +23,13 @@ AI agent のツールはベストプラクティスが変わり続けるため�
 
 `main` は直接編集してかまいません。実験用の branch を試したい場合は repo 外の `git worktree` で作業し、`DOTPATH` を worktree に向けて `install.sh` を実行しません。詳しくは [docs/worktree-workflow.md](docs/worktree-workflow.md) を参照します。
 
-以前は `main` → `profile/ecc-base` → `profile/ecc/<environment>` の branch 積層で ECC の生成物を管理していました。この構成は 2026-09-26 に廃止し、旧 branch は `archive/` 配下に残しています。旧構成を適用している PC の移行手順は [docs/migration-from-ecc.md](docs/migration-from-ecc.md) を参照します。
+以前は `main` → `profile/ecc-base` → `profile/ecc/<environment>` の branch 積層で ECC の生成物を管理していました。この構成は 2026-09-26 に廃止し、旧 branch は各 PC の local で `archive/profile/...` という名前の branch として残しています。旧構成を適用している PC の移行手順は [docs/migration-from-ecc.md](docs/migration-from-ecc.md) を参照します。
 
-別の profile を追加する場合は、`profiles/<name>/` に `profile.tsv`, `surfaces.tsv`, `skipsets.tsv`, 必要なら `checks.d/` と `bin/test-profile.sh` を置きます。具体的な作成・検証手順は [docs/development.md](docs/development.md) を参照します。
+別の profile を追加する場合は、`profiles/<name>/` に `profile.tsv`, `surfaces.tsv`, `skipsets.tsv`, smoke test 用の `bin/test-profile.sh` (`test-all.sh` と CI が必須とする) と、必要なら `checks.d/` を置きます。具体的な作成・検証手順は [docs/development.md](docs/development.md) を参照します。
 
 ## Repository Layout
 
-このリポジトリでは、portable な top-level dotfiles、共通 installer、profile manifest、agent tool の個人設定を管理します。
+このリポジトリでは、portable な top-level dotfiles、共通 installer、profile manifest、agent tool の個人設定を管理します。profile・surface・managed root などの用語は [docs/reference/profile-manifest.md の Concepts](docs/reference/profile-manifest.md#concepts) で説明しています。
 
 | Path | Role |
 |---|---|
@@ -67,7 +67,7 @@ Claude Code / Codex などの agent tool については、次の方針で管理
 
 ## New Machine Setup
 
-`install.sh` は symlink を張るだけで、tool 本体は入れません。先に次を用意します。oh-my-zsh が無い場合、theme の link は黙って skip されるため、後から入れたら `bash install.sh` を再実行します。
+`install.sh` は symlink を張るだけで、tool 本体は入れません。先に次を用意します。oh-my-zsh が無い場合、theme の link は `Skip:` と表示されるだけで install は成功扱いになるため、後から入れたら `bash install.sh` を再実行します。
 
 | Tool | 使う場所 |
 |---|---|
@@ -124,7 +124,7 @@ installer や profile を変更するときの検証方法、個別 test の実�
 
 ## Managed Dotfile Surfaces
 
-managed dotfile surface は、managed root 配下にある source を、実 HOME 配下のどの dest へ、どの粒度で symlink するかを宣言する単位です。managed root directory 自体は実 HOME 側に残し、credential、cache、session などの runtime state は HOME-local な実体として保持します。再現したい entry だけを dotfiles 側の desired state として管理し、実 HOME 側へ symlink します。
+managed dotfile surface は、managed root 配下にある source を、実 HOME 配下のどの dest へ、どの粒度で symlink するかを宣言する単位です。managed root directory 自体は実 HOME 側の実体のまま残ります。
 
 主な strategy は、directory 内の entry を個別に symlink する `entries` と、file / directory 自体を 1 つの package として symlink する `whole` です。
 
@@ -139,7 +139,7 @@ skipsets.tsv   entries surface から除外して実 HOME に残す entry 名 pa
 checks.d/      profile 適用前に実行する branch-specific check
 ```
 
-`skipsets.tsv` では `skipset	<name>	<pattern>` に加えて、`skipset-include	<name>	<include-name>` で共通 pattern 群を合成できます。include 先は前方参照できず、自己 include・循環 include・重複 include は invalid です。
+`skipset-include` による pattern 群の合成など、各 file の規則は reference を参照します。
 
 ## Safety Rules
 

@@ -23,7 +23,7 @@ phase 実行
 result summary
 ```
 
-entrypoint 自身に残すものは、bash guard、usage text、entrypoint 固有 phase だけです。`scripts/install/lib/cli.sh` は option parsing、`DOTPATH` / `OH_MY_ZSH_THEMES` 初期化、`cd "$DOTPATH"`、`shopt -s nullglob dotglob`、library 読み込みを担当します。
+entrypoint 自身に残すものは、bash guard、usage text、entrypoint 固有 phase だけです。`DOTPATH` の初期化 (既定 `$HOME/dotfiles`) と `common.sh` / `cli.sh` の読み込みも entrypoint が行います。library の場所を知るために `DOTPATH` が先に必要なためです。`scripts/install/lib/cli.sh` は option parsing、`OH_MY_ZSH_THEMES` 初期化、`cd "$DOTPATH"`、`shopt -s nullglob dotglob`、state 初期化、残りの library 読み込みを担当します。
 
 `init_installer_state` が初期化する global state は次の通りです。
 
@@ -34,7 +34,7 @@ entrypoint 自身に残すものは、bash guard、usage text、entrypoint 固�
 | `SKIPSET_PATTERNS` | `profile.sh` | 展開済み skipset pattern。 |
 | `SKIPSET_INCLUDES` | `profile.sh` | `skipset-include` の依存関係。 |
 | `KNOWN_SKIPSETS` | `profile.sh` | `surfaces.tsv` から参照可能な skipset 名。 |
-| `RESERVED_ROOT_ENTRIES` | `profile.sh` | top-level dotfile link から除外する active profile root。 |
+| `RESERVED_ROOT_ENTRIES` | `profile.sh` | top-level dotfile link から除外する active profile root。surface は managed root 配下に限られ、managed root は常に除外されるため、現状は防御的な重複。 |
 | `ACTIVE_PROFILE_CHECK_DIRS` | `profile.sh` | install preflight で実行する check directory。 |
 
 library の責務境界は次の通りです。
@@ -67,8 +67,8 @@ dry-run と verbose は別軸です。`--dry-run` は書き込み判定と summa
 | `bash scripts/install/test-installer.sh` | common installer の regression。fixture checkout と fixture HOME だけを使う。 |
 | `bash scripts/install/test-installer.sh --case '60-*'` | case file 名または test 名 glob による部分実行。 |
 | `bash scripts/install/test-profile.sh --profile profiles/<name> --branch <branch>` | profile manifest と surface が isolated HOME に適用できるかの smoke test。 |
-| `bash profiles/<name>/bin/test-profile.sh --branch <branch>` | profile-local wrapper を使った smoke test。wrapper がある profile で実行する。 |
-| `bash scripts/install/test-all.sh` | lint、installer regression、active profile smoke test の集約。 |
+| `bash profiles/<name>/bin/test-profile.sh --branch <branch>` | profile-local wrapper を使った smoke test。`test-all.sh` は active profile ごとにこの wrapper を呼ぶため、wrapper は必須。 |
+| `bash scripts/install/test-all.sh [--branch <branch>] [--profile <dir>] [--no-lint]` | lint、installer regression、active profile smoke test の集約。`--branch` で active profile の判定に使う branch を指定する (worktree や CI で使用)。branch を判定できない場合は smoke test を skip して成功扱いになる。 |
 
 実 HOME を直接変更する test は書きません。実 HOME に対して確認したい場合は `bash install.sh --dry-run`, `bash uninstall.sh --dry-run`, `bash status.sh` に留めます。
 
@@ -78,7 +78,7 @@ dry-run と verbose は別軸です。`--dry-run` は書き込み判定と summa
 
 既存 profile を元に別 profile を作る場合は、`profiles/<name>/` を一式コピーします。`profile.tsv`, `surfaces.tsv`, `skipsets.tsv`, `checks.d/` に加えて、`bin/` に置いた profile-local な補助 script や smoke test も移植対象です。
 
-移植後は `profile.tsv` の branch pattern と manifest / check path を新しい profile に合わせます。smoke test は、branch pattern が 1 つ以上あり、検査対象の branch で profile が有効になることを確認します。まず共通 runner で manifest と surface を検証し、profile-local wrapper がある場合は wrapper からも同じ smoke test が通ることを確認します。
+移植後は `profile.tsv` の branch pattern と manifest / check path を新しい profile に合わせます。smoke test は、branch pattern が 1 つ以上あり、検査対象の branch で profile が有効になることを確認します。まず共通 runner で manifest と surface を検証し、profile-local wrapper からも同じ smoke test が通ることを確認します。
 
 ```bash
 bash scripts/install/test-profile.sh \
@@ -123,7 +123,7 @@ test_example_behavior() {
 register_test "example behavior" test_example_behavior
 ```
 
-fixture の作り方は `setup_fixture` を起点にします。`setup_fixture` は installer entrypoint、`scripts/install/lib/`、test profile manifest を fixture checkout にコピーします。必要な source file や HOME 側 conflict は case 内で明示的に作ります。
+fixture の作り方は `setup_fixture` を起点にします。`setup_fixture` は installer entrypoint と `scripts/install/lib/` を fixture checkout にコピーし、test 専用の合成 profile (`profiles/test`, branch `profile/test-base`) を書き出します。`profiles/base` は使いません。必要な source file や HOME 側 conflict は case 内で明示的に作ります。
 
 assert は harness の helper を優先します。文言を変える場合は、`assert_file_contains` / `assert_file_not_contains` でその文言を見ている case を同時に更新します。
 

@@ -45,7 +45,10 @@
     git switch main
     git merge --ff-only origin/main
     git branch -m <旧 leaf branch> archive/<旧 leaf branch>
+    git branch -m profile/ecc-base archive/profile/ecc-base
     ```
+
+    旧 `main` を適用していた PC (leaf を持たない PC) は、leaf の rename を省きます。local に `profile/ecc-base` が無ければ、その行も省きます。
 
 4. 新構成を適用し、確認します。
 
@@ -55,7 +58,7 @@
     bash status.sh
     ```
 
-    conflict で止まった場合は、書き込み前に停止しています。表示された HOME 側の実ファイルを退避して再実行します。
+    conflict で止まった場合は、symlink を作る前に停止しています (stale link の cleanup だけは先に実行されます)。表示された HOME 側の実ファイルを退避して再実行します。
 
 5. 手順 1 で commit したその PC 固有の設定を `git diff main archive/<旧 leaf branch> -- .claude/settings.json .codex/config.toml` で比較し、必要な差分だけを `main` に取り込みます。Codex の `[projects."<path>"]` の trust 設定は、Codex が link 先の repo 内 `config.toml` へ直接書き込むため、PC ごとに差分として現れます。
 
