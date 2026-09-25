@@ -13,7 +13,6 @@ notify = [
   "-sound",
   "default"
 ]
-persistent_instructions = "Follow project AGENTS.md guidelines. Use available MCP servers when they can help."
 
 [mcp_servers.openaiDeveloperDocs]
 url = "https://developers.openai.com/mcp"

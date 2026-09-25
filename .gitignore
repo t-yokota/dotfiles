@@ -49,23 +49,3 @@
 .codex/*.sqlite
 .codex/*.sqlite-wal
 .codex/*.sqlite-shm
-
-# User-level agent runtime/cache state
-.agents/logs/
-.agents/backups/
-.agents/cache/
-.agents/caches/
-.agents/tmp/
-.agents/plugins/
-.agents/plugin-cache/
-.agents/sessions/
-.agents/.credentials.json
-.agents/credentials.json
-.agents/config.json
-.agents/models_cache.json
-.agents/session_index.jsonl
-.agents/*.log
-.agents/*.db
-.agents/*.sqlite
-.agents/*.sqlite-wal
-.agents/*.sqlite-shm
