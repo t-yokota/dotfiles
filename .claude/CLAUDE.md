@@ -5,7 +5,7 @@ Personal defaults loaded into every Claude Code session via `~/.claude/CLAUDE.md
 ## Preferences
 
 - No emojis in code, comments, or documentation.
-- Commit messages follow conventional commits (`feat:`, `fix:`, `refactor:`, `docs:`, `test:`, `chore:`) without a Co-Authored-By trailer.
+- Commit messages follow conventional commits (`feat:`, `fix:`, `refactor:`, `docs:`, `test:`, `chore:`).
 - Never paste secrets (API keys, tokens, passwords, JWTs) into output; redact them from logs.
 
 ## Bash command style
