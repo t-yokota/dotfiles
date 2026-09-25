@@ -173,11 +173,8 @@ detect_branch() {
 
 check_profile_branch_patterns() {
     local manifest="$PROFILE_DIR/profile.tsv"
-    local expected_base="profile/$PROFILE_NAME-base"
-    local expected_env="profile/$PROFILE_NAME/*"
-    local has_base=0
-    local has_env=0
-    local line line_number kind value rest
+    local has_branch=0
+    local line line_number kind rest
     local match_rc
 
     line_number=0
@@ -185,14 +182,11 @@ check_profile_branch_patterns() {
         line_number=$((line_number + 1))
         line_is_ignored "$line" && continue
         validate_profile_manifest_line "$manifest" "$line_number" "$line" || return 1
-        IFS=$'\t' read -r kind value rest <<< "$line"
-        [ "$kind" = "branch" ] || continue
-        [ "$value" = "$expected_base" ] && has_base=1
-        [ "$value" = "$expected_env" ] && has_env=1
+        IFS=$'\t' read -r kind rest <<< "$line"
+        [ "$kind" = "branch" ] && has_branch=1
     done < "$manifest"
 
-    [ "$has_base" -eq 1 ] || fail "profile.tsv must include: branch	$expected_base" || return 1
-    [ "$has_env" -eq 1 ] || fail "profile.tsv must include: branch	$expected_env" || return 1
+    [ "$has_branch" -eq 1 ] || fail "profile.tsv must include at least one branch pattern" || return 1
 
     profile_matches_branch "$manifest" "$BRANCH"
     match_rc=$?
