@@ -60,6 +60,57 @@ installer 本体の変更はありません。profile は既存どおり `profil
 | F6 (worktree 運用) | 任意に降格。`main` を直接編集してよい。 |
 | F3 (profile scaffolding) | 保留。profile を増やす必要が出た時点で再検討。 |
 
+## Migrating Other Machines
+
+旧構成 (`profile/ecc/*` の leaf branch、または旧 `main`) を適用している他の PC は、次の順で移行します。`~/dotfiles` で `git reset --hard` と `git clean` は使いません。
+
+1. 現状を確認し、手元の変更を退避します。leaf の `.claude/settings.json` や `.codex/config.toml` に、その PC だけの変更が残っていることがあります。
+
+    ```bash
+    cd ~/dotfiles
+    git status --short
+    git branch --show-current
+    git worktree list
+    ```
+
+    未 commit の変更は leaf 上で commit し、あとで `main` と比較できるようにします。`main` を checkout している worktree (`~/dotfiles-worktrees/main` など) があれば `git worktree remove` で外します。
+
+2. 旧 link を外します。uninstall は、この checkout を指す symlink だけを削除します。
+
+    ```bash
+    bash uninstall.sh --dry-run
+    bash uninstall.sh
+    ```
+
+3. `main` へ切り替え、leaf を archive 名にします。
+
+    ```bash
+    git fetch origin
+    git switch main
+    git merge --ff-only origin/main
+    git branch -m <旧 leaf branch> archive/<旧 leaf branch>
+    ```
+
+4. 新構成を適用し、確認します。
+
+    ```bash
+    bash install.sh --dry-run
+    bash install.sh
+    bash status.sh
+    ```
+
+    conflict で止まった場合は、書き込み前に停止しています。表示された HOME 側の実ファイルを退避して再実行します。
+
+5. 手順 1 で commit したその PC 固有の設定を `git diff main archive/<旧 leaf branch> -- .claude/settings.json .codex/config.toml` で比較し、必要な差分だけを `main` に取り込みます。Codex の `[projects."<path>"]` の trust 設定は、Codex が link 先の repo 内 `config.toml` へ直接書き込むため、PC ごとに差分として現れます。
+
+6. 残骸を片付けます。
+    - 空になった ECC 用 directory を削除します: `find ~/.claude/skills/ecc ~/.claude/rules ~/.claude/.agents ~/.codex/prompts ~/.agents -depth -type d -empty -delete`
+    - ECC を plugin として入れていた場合は、`claude plugin list` で確認し、`claude plugin uninstall ecc@ecc` で外します。
+    - `git config --global --get core.hooksPath` が ECC の hook directory を指していれば、`git config --global --unset core.hooksPath` で外します。
+    - checkout 内の ignored な ECC state (`.claude/ecc/`, `.codex/*sync-state.json`, `.codex/git-hooks/` など) は、rollback に使うため残します。
+
+7. Claude Code と Codex を再起動し、Claude では `/context` を実行して、常時ロードされる memory が `~/.claude/CLAUDE.md` だけであることを確認します。
+
 ## Rollback
 
 旧構成へ戻す場合は、tool link を外してから archive branch を適用します。archive branch の preflight check が参照する ECC の local state (`.claude/ecc/`, `.codex/dotfiles-profile-ecc-sync-state.json` など、ignored) は checkout 内に残してあります。
