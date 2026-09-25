@@ -5,7 +5,6 @@ on:
   push:
     branches:
       - main
-      - integrate/**
   pull_request:
 
 jobs:
@@ -31,4 +30,4 @@ jobs:
         run: bash scripts/install/lint.sh
 
       - name: Installer tests
-        run: bash scripts/install/test-all.sh --branch "${{ matrix.branch }}"
+        run: bash scripts/install/test-all.sh --no-lint --branch "${{ matrix.branch }}"
