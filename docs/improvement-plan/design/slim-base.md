@@ -11,8 +11,8 @@
 |---|---|---|
 | 方針決定 | 完了 | ユーザー合意。ECC は導入しない。 |
 | `main` に base profile と個人設定を追加 | 完了 | `bash scripts/install/test-all.sh --branch main` 全 PASS。 |
-| 実 HOME の cutover | 未着手 | `uninstall.sh` → `git switch main` → `install.sh` の後、`status.sh` で確認する。 |
-| 旧 branch の archive | 未着手 | `archive/profile/ecc-base`, `archive/profile/ecc/full/home-9M2KERO` へ rename する (local のみ)。 |
+| 実 HOME の cutover | 完了 | `uninstall.sh` (旧 link 510 本を削除) → `git switch main` → `install.sh` (13 本を link)。`status.sh` は linked 13 / missing・conflicts・stale・orphaned 0。空になった ECC 用 directory (`~/.claude/rules`, `~/.claude/skills/ecc`, `~/.claude/.agents`, `~/.codex/prompts`, `~/.agents`) を削除。 |
+| 旧 branch の archive | 完了 | `archive/profile/ecc-base`, `archive/profile/ecc/full/home-9M2KERO` へ rename (local のみ、未 push)。旧 worktree 2 つを削除。 |
 
 ## Background
 
