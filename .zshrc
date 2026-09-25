@@ -145,10 +145,10 @@ alias voff='deactivate'
 #[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
 
 ### mise
-eval "$(/home/yokota/.local/bin/mise activate zsh)"
+[ -x "$HOME/.local/bin/mise" ] && eval "$("$HOME/.local/bin/mise" activate zsh)"
 
 # bun completions
-[ -s "/home/yokota/.bun/_bun" ] && source "/home/yokota/.bun/_bun"
+[ -s "$HOME/.bun/_bun" ] && source "$HOME/.bun/_bun"
 
 # bun
 export BUN_INSTALL="$HOME/.bun"
