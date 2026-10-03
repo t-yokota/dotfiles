@@ -33,7 +33,7 @@ warn_unknown_branch_no_profile() {
 # loaded surface manifest.
 should_skip_root_entry() {
     case "$1" in
-        .git|.github|.gitignore|.gitconfig.local)
+        .git|.github|.gitignore|.gitattributes|.gitconfig.local)
             return 0
             ;;
     esac

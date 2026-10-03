@@ -11,6 +11,7 @@ test_base_profile_entry_links() {
     write_file "$fixture/.github/workflows/verify.yml" "ci" || return 1
     write_file "$fixture/.gitignore" "ignored" || return 1
     write_file "$fixture/.gitconfig.local" "local" || return 1
+    write_file "$fixture/.gitattributes" "* text=auto eol=lf" || return 1
     write_file "$fixture/.codex/config.toml" "config" || return 1
     write_file "$fixture/.codex/settings.json" "{}" || return 1
     write_file "$fixture/.codex/cache/session.json" "{}" || return 1
@@ -26,6 +27,7 @@ test_base_profile_entry_links() {
     assert_absent "$home/.github" || return 1
     assert_absent "$home/.gitignore" || return 1
     assert_absent "$home/.gitconfig.local" || return 1
+    assert_absent "$home/.gitattributes" || return 1
     assert_file_contains "$output" "Install Result" || return 1
     assert_file_contains "$output" "Links    :" || return 1
     assert_file_contains "$output" "Removals :" || return 1

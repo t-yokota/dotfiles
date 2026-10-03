@@ -63,7 +63,7 @@ Claude Code / Codex などの agent tool については、次の方針で管理
 
 大きな流れは Preflight → Cleanup → Link Conflict Check → Link Top-Level Dotfiles → Link Managed Dotfile Surfaces → Link Shell Themes です。詳細な責務分担、global state、test case の追加手順は [docs/development.md](docs/development.md) を参照します。
 
-`.git`, `.github`, `.gitignore`, `.gitconfig.local`, `.claude`, `.codex`, `.agents` は top-level symlink 対象から外します。`.claude`, `.codex`, `.agents` は managed root として扱い、profile が有効な場合だけ surface 定義に従って必要な entry を HOME に出します。
+`.git`, `.github`, `.gitignore`, `.gitattributes`, `.gitconfig.local`, `.claude`, `.codex`, `.agents` は top-level symlink 対象から外します。`.claude`, `.codex`, `.agents` は managed root として扱い、profile が有効な場合だけ surface 定義に従って必要な entry を HOME に出します。
 
 ## New Machine Setup
 

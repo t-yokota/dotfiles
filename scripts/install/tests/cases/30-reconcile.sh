@@ -34,6 +34,23 @@ test_stale_managed_symlink_cleanup() {
     assert_symlink_target "$home/.codex/items/current.txt" "$fixture/.codex/items/current.txt" || return 1
 }
 
+test_repo_control_root_link_cleanup() {
+    local fixture="$TEST_ROOT/repo-control-fixture"
+    local home="$TEST_ROOT/repo-control-home"
+    local output="$TEST_ROOT/repo-control-output.log"
+
+    setup_fixture "$fixture" "$home" || return 1
+    write_file "$fixture/.zshrc" "zsh" || return 1
+    write_file "$fixture/.gitattributes" "* text=auto eol=lf" || return 1
+    ln -s "$fixture/.gitattributes" "$home/.gitattributes" || return 1
+
+    run_install_args "$fixture" "$home" "$TEST_BRANCH" "$output" --verbose || return 1
+
+    assert_absent "$home/.gitattributes" || return 1
+    assert_symlink_target "$home/.zshrc" "$fixture/.zshrc" || return 1
+    assert_file_contains "$output" "Remove symlink: $home/.gitattributes -> $fixture/.gitattributes" || return 1
+}
+
 test_inactive_profile_managed_root_cleanup() {
     local fixture="$TEST_ROOT/inactive-profile-fixture"
     local home="$TEST_ROOT/inactive-profile-home"
@@ -78,4 +95,5 @@ surface	entries	.claude/agents	.claude/agents	none	Claude agents" || return 1
 
 register_test "unmanaged entry conflict" test_unmanaged_entry_conflict
 register_test "stale managed symlink cleanup" test_stale_managed_symlink_cleanup
+register_test "repo control root link cleanup" test_repo_control_root_link_cleanup
 register_test "inactive profile managed-root cleanup" test_inactive_profile_managed_root_cleanup

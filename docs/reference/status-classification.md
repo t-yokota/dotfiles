@@ -10,7 +10,7 @@
 
 | Scope | 判定対象 |
 |---|---|
-| Top-level dotfiles | `DOTPATH` 直下の `.??*` のうち、`.git`, `.github`, `.gitignore`, `.gitconfig.local` と managed root を除いたもの |
+| Top-level dotfiles | `DOTPATH` 直下の `.??*` のうち、`.git`, `.github`, `.gitignore`, `.gitattributes`, `.gitconfig.local` と managed root を除いたもの |
 | Managed surfaces | active profile の `surfaces.tsv` が定義する `entries` / `whole` surface |
 | Shell themes | `DOTPATH` 直下の `*.zsh-theme` と `OH_MY_ZSH_THEMES` |
 | Unexpected managed links | `HOME` 直下、managed root 配下、active surface の destination、shell theme directory 内の dotfiles-managed symlink |
